@@ -1,4 +1,6 @@
 
+# It allows Team D and other consumers to request enterprise_total_profit without redefining the calculation or manually writing SQL joins.
+
 version: 2
 
 metrics:
@@ -9,7 +11,7 @@ metrics:
       Team A Equity Position profit and
       Team C Fixed Income Position profit.
     type: derived
-    expr: equity_profit + fi_profit
+    expr: coalesce(equity_profit, 0) + coalesce(fi_profit, 0)
     input_metrics:
       - name: team_a_profit
         alias: equity_profit
