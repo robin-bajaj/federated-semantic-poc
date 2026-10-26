@@ -1,0 +1,43 @@
+
+version: 2
+
+models:
+  - name: stg_team_c_positions
+    description: "Team C Fixed Income Position semantic model."
+
+    semantic_model:
+      enabled: true
+      name: team_c_fi_positions
+
+    agg_time_dimension: report_date
+
+    columns:
+      - name: position_id
+        entity:
+          name: team_c_position
+          type: primary
+
+      - name: report_date
+        granularity: day
+        dimension:
+          type: time
+
+      - name: instrument_code
+        entity:
+          name: instrument
+          type: foreign
+
+    metrics:
+      - name: team_c_profit
+        label: Team C Total Profit
+        description: "Total profit across Team C Fixed Income Positions."
+        type: simple
+        agg: sum
+        expr: profit
+
+      - name: team_c_position_count
+        label: Team C Position Count
+        description: "Number of Team C Fixed Income Positions."
+        type: simple
+        agg: count
+        expr: position_id

@@ -1,0 +1,43 @@
+
+version: 2
+
+models:
+  - name: stg_team_a_positions
+    description: "Team A Equity Position semantic model."
+
+    semantic_model:
+      enabled: true
+      name: team_a_equity_positions
+
+    agg_time_dimension: report_date
+
+    columns:
+      - name: position_id
+        entity:
+          name: team_a_position
+          type: primary
+
+      - name: report_date
+        granularity: day
+        dimension:
+          type: time
+
+      - name: instrument_code
+        entity:
+          name: instrument
+          type: foreign
+
+    metrics:
+      - name: team_a_profit
+        label: Team A Total Profit
+        description: "Total profit across Team A Equity Positions."
+        type: simple
+        agg: sum
+        expr: profit
+
+      - name: team_a_position_count
+        label: Team A Position Count
+        description: "Number of Team A Equity Positions."
+        type: simple
+        agg: count
+        expr: position_id

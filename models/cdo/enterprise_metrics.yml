@@ -1,0 +1,17 @@
+
+version: 2
+
+metrics:
+  - name: enterprise_total_profit
+    label: Enterprise Total Profit
+    description: >
+      CDO-governed enterprise profit metric combining
+      Team A Equity Position profit and
+      Team C Fixed Income Position profit.
+    type: derived
+    expr: equity_profit + fi_profit
+    input_metrics:
+      - name: team_a_profit
+        alias: equity_profit
+      - name: team_c_profit
+        alias: fi_profit

@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: stg_team_b_instruments
+    description: "Team B's instrument reference model."
+
+    semantic_model:
+      enabled: true
+      name: instruments
+
+    columns:
+      - name: instrument_code
+        entity:
+          name: instrument
+          type: primary
+
+      - name: security_type
+        dimension:
+          type: categorical
