@@ -34,6 +34,7 @@ models:
         type: simple
         agg: sum
         expr: profit
+        fill_nulls_with: 0
 
       - name: team_a_position_count
         label: Team A Position Count

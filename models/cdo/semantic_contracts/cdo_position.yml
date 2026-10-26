@@ -1,0 +1,51 @@
+
+version: 1
+
+concepts: # What business objects are we defining?
+# This declares the enterprise business concept Position, owned by the CDO.
+# It does not create a PostgreSQL table or a dbt model. It simply describes a logical business object.
+  - name: enterprise_position
+    label: Enterprise Position
+    description: >
+      Common business definition of a Position
+      across Equity and Fixed Income teams.
+
+    grain: # What makes a Position unique?
+    # This states that a Position is identified by the combination of its team and its Position ID.
+      - source_team
+      - position_id
+
+    attributes:
+      - name: position_id
+        type: string
+        required: true
+
+      - name: report_date
+        type: date
+        required: true
+
+      - name: profit
+        type: decimal
+        required: true
+
+      - name: instrument_code
+        type: integer
+        required: true
+
+    mappings: # How do teams implement those attributes?
+    # This tells us that both teams staging models implement the CDO's four attributes
+      - team: team_a
+        model: stg_team_a_positions
+        fields:
+          position_id: position_id
+          report_date: report_date
+          profit: profit
+          instrument_code: instrument_code
+
+      - team: team_c
+        model: stg_team_c_positions
+        fields:
+          position_id: position_id
+          report_date: report_date
+          profit: profit
+          instrument_code: instrument_code
