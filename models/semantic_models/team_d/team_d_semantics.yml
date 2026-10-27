@@ -2,7 +2,7 @@
 version: 2
 
 models:
-  - name: team_d_reporting_cost
+  - name: stg_team_d_reporting_cost
     description: "Team D reporting cost model."
 
     semantic_model:

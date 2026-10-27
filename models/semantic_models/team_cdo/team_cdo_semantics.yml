@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: stg_team_cdo
+  - name: fct_cdo_positions
     description: >
       CDO Common Position model combining
       Team A and Team C positions.
