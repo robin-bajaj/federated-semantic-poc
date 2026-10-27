@@ -1,4 +1,4 @@
-posIdentity,rptDate,profitloss,insCode
-C001,2026-10-20,3000,103
-C002,2026-10-20,1500,102
-C003,2026-10-20,-200,103
+posIdentity,rptDate,profitloss,settledCash,insCode
+2001,2026-10-20,3000,8000,103
+2002,2026-10-20,1500,6000,102
+2003,2026-10-20,-200,1500,103

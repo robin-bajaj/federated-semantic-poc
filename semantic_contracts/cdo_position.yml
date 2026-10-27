@@ -1,6 +1,7 @@
 
 version: 1
 
+# The CDO defines common business concepts first, and different tteams map their independently developed models to those concepts.
 concepts: # What business objects are we defining?
 # This declares the enterprise business concept Position, owned by the CDO.
 # It does not create a PostgreSQL table or a dbt model. It simply describes a logical business object.
