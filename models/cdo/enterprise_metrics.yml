@@ -1,19 +1,28 @@
-
 # It allows Team D and other consumers to request enterprise_total_profit without redefining the calculation or manually writing SQL joins.
 
 version: 2
 
 metrics:
-  - name: enterprise_total_profit
-    label: Enterprise Total Profit
+  - name: enterprise_total_profit_loss
+    label: Enterprise Total Profit and Loss
     description: >
-      CDO-governed enterprise profit metric combining
-      Team A Equity Position profit and
-      Team C Fixed Income Position profit.
-    type: derived
-    expr: coalesce(equity_profit, 0) + coalesce(fi_profit, 0)
+      CDO-governed enterprise-wide net Profit and Loss (P&L)
+      metric combining Equity Position P&L from Team A
+      and Fixed Income Position P&L from Team C.
+
+      Positive values represent a net profit, while
+      negative values represent a net loss.
+
+      This metric provides a consistent enterprise-level
+      P&L calculation that can be reused by downstream
+      teams and reporting applications.
+
+    type: derived # A derived metric calculates a result from other metrics.
+    
+    expr: coalesce(equity_pnl, 0) + coalesce(fi_pnl, 0)
+   
     input_metrics:
-      - name: team_a_profit
-        alias: equity_profit
-      - name: team_c_profit
-        alias: fi_profit
+      - name: equity_profit_loss
+        alias: equity_pnl
+      - name: fixed_income_profit_loss
+        alias: fi_pnl

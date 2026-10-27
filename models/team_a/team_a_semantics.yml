@@ -1,44 +1,45 @@
+version: 2 # dbt properties-file format
 
-version: 2
-
-models:
-  - name: stg_team_a_positions
+models: # Defines metadata for dbt models
+  - name: stg_team_a_positions # Associates this YAML with existing SQL model
     description: "Team A Equity Position semantic model."
 
     semantic_model:
-      enabled: true
-      name: team_a_equity_positions
+      enabled: true # Enables the model for the dbt Semantic Layer
+      name: team_a_equity_positions # Gives the semantic model its business-oriented name
 
-    agg_time_dimension: report_date
+    agg_time_dimension: report_date # This tells MetricFlow that report_date is a time dimension and the default aggregation time dimension.
 
     columns:
-      - name: position_id
-        entity:
-          name: team_a_position
+      - name: position_id # Column in the staging model
+        entity: # Identifies a business object and helps establish relationships between semantic models.
+          name: team_a_position # Semantic entity name
           type: primary
 
-      - name: report_date
+      - name: report_date # Column in the staging model
         granularity: day
-        dimension:
+        dimension: # Describes a business object and is used to filter or group data.
           type: time
 
-      - name: instrument_code
+      - name: instrument_code # Column in the staging model
         entity:
-          name: instrument
+          name: instrument 
           type: foreign
 
     metrics:
-      - name: team_a_profit
-        label: Team A Total Profit
-        description: "Total profit across Team A Equity Positions."
-        type: simple
-        agg: sum
-        expr: profit
-        fill_nulls_with: 0
+      - name: equity_profit_loss # Technical metric identifier
+        label: Equity Profit and Loss # Business-friendly name
+        description: >
+          Net profit or loss across Team A equity positions.
+          Positive value represents profit and negative values represen loss.
+        type: simple # Aggregation-based metric
+        agg: sum # Add values together
+        expr: profit_loss # Use the staging column profit_loss
+        fill_nulls_with: 0 # Replace null metric results with zero
 
-      - name: team_a_position_count
-        label: Team A Position Count
+      - name: team_a_position_count # Technical metric identifier
+        label: Team A Position Count # Business-friendly name
         description: "Number of Team A Equity Positions."
-        type: simple
-        agg: count
-        expr: position_id
+        type: simple # Aggregation-based metric
+        agg: count # Add values together
+        expr: position_id # Use the staging column position_id

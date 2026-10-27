@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: stg_team_cdo
+    description: >
+      CDO Common Position model combining
+      Team A and Team C positions.
+
+    semantic_model:
+      enabled: true
+      name: team_cdo_positions
+
+    agg_time_dimension: report_date
+
+    columns:
+      - name: cdo_position_key
+        entity:
+          name: cdo_position
+          type: primary
+
+      - name: report_date
+        granularity: day
+        dimension:
+          type: time
+
+      - name: source_team
+        dimension:
+          type: categorical
+
+      - name: instrument_id
+        entity:
+          name: cdo_instrument
+          type: foreign
+
+    metrics:
+      - name: cdo_total_profit_loss
+        label: CDO Total Profit and Loss
+        type: simple
+        agg: sum
+        expr: profit_loss
+
+      - name: cdo_position_count
+        label: CDO Position Count
+        type: simple
+        agg: count
+        expr: cdo_position_key

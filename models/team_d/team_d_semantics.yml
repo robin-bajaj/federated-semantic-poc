@@ -32,11 +32,11 @@ metrics:
     label: Team D Net Profit
     description: >
       Net profit calculated using the CDO-governed
-      enterprise profit metric and Team D reporting costs.
+      enterprise metric and Team D reporting costs.
     type: derived
-    expr: coalesce(enterprise_profit, 0) - coalesce(reporting_cost, 0)
+    expr: coalesce(enterprise_pnl, 0) - coalesce(reporting_cost, 0)
     input_metrics:
-      - name: enterprise_total_profit
-        alias: enterprise_profit
+      - name: enterprise_total_profit_loss
+        alias: enterprise_pnl
       - name: team_d_total_reporting_cost
         alias: reporting_cost

@@ -1,0 +1,30 @@
+
+version: 2
+
+models:
+  - name: common_instrument
+    description: >
+      CDO Common Instrument semantic model
+      mapped from Team B Instrument data.
+
+    semantic_model:
+      enabled: true
+      name: cdo_common_instrument
+
+    columns:
+      - name: instrument_code
+        entity:
+          name: cdo_instrument
+          type: primary
+
+      - name: instrument_type
+        dimension:
+          type: categorical
+
+      - name: isin
+        dimension:
+          type: categorical
+
+      - name: cusip
+        dimension:
+          type: categorical
