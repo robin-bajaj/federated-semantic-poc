@@ -1,0 +1,76 @@
+
+title: CDO Executive Positions
+source: default
+extends: vivid
+style:
+  frame:
+    max_width: 1180
+    card_gap: 16
+    card_padding: 24
+  accent: '#008A00'
+  charts:
+    kpi:
+      align: left
+      min_card_width: 260
+      default_height: 180
+      border:
+        width: 1
+        color: '#D5E9D8'
+        radius: 12
+      label:
+        font:
+          size: 14
+          weight: 600
+          color: '#496451'
+      value:
+        font:
+          size: 36
+          weight: 700
+          color: '#005A20'
+
+queries:
+  cdo_summary:
+    sql: |
+      SELECT
+        COUNT(*) AS position_count,
+        SUM(profit_loss) AS total_profit_loss,
+        AVG(profit_loss) AS average_profit_loss
+      FROM dbt_federated_poc.fct_cdo_positions
+
+charts:
+  total_pnl:
+    type: kpi
+    label: Total profit and loss
+    query: cdo_summary
+    value: total_profit_loss
+    style:
+      background: '#EAF7EB'
+      value:
+        format: integer
+        font:
+          size: 44
+          color: '#008A00'
+
+  position_count:
+    type: kpi
+    label: Total positions
+    query: cdo_summary
+    value: position_count
+    style:
+      value:
+        format: integer
+
+  average_pnl:
+    type: kpi
+    label: Average profit and loss per position
+    query: cdo_summary
+    value: average_profit_loss
+    style:
+      value:
+        format: number_full
+
+rows:
+  - cols:
+      - total_pnl
+      - position_count
+      - average_pnl
