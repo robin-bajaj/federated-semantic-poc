@@ -1,0 +1,14 @@
+title: CDO Connection Test
+source: default
+queries:
+  test_connection:
+    sql: |
+      SELECT 1 AS test_value
+charts:
+  connection_check:
+    type: kpi
+    label: Database connection test
+    query: test_connection
+    value: test_value
+rows:
+  - connection_check
