@@ -1,14 +1,36 @@
-title: CDO Connection Test
+
+title: CDO Executive Positions
 source: default
+
 queries:
-  test_connection:
+  cdo_summary:
     sql: |
-      SELECT 1 AS test_value
+      SELECT
+        COUNT(*) AS position_count,
+        SUM(profit_loss) AS total_profit_loss,
+        AVG(profit_loss) AS average_profit_loss
+      FROM dbt_federated_poc.fct_cdo_positions
+
 charts:
-  connection_check:
+  total_pnl:
     type: kpi
-    label: Database connection test
-    query: test_connection
-    value: test_value
+    label: Total profit and loss
+    query: cdo_summary
+    value: total_profit_loss
+
+  position_count:
+    type: kpi
+    label: Total positions
+    query: cdo_summary
+    value: position_count
+
+  average_pnl:
+    type: kpi
+    label: Average profit and loss per position
+    query: cdo_summary
+    value: average_profit_loss
+
 rows:
-  - connection_check
+  - total_pnl
+  - position_count
+  - average_pnl
