@@ -7,7 +7,7 @@ style:
     max_width: 1180
     card_gap: 16
     card_padding: 24
-  accent: '#265E87'
+  accent: '#008A00'
   charts:
     kpi:
       align: left
@@ -15,18 +15,18 @@ style:
       default_height: 180
       border:
         width: 1
-        color: '#DCE5EF'
+        color: '#D5E9D8'
         radius: 12
       label:
         font:
           size: 14
           weight: 600
-          color: '#536579'
+          color: '#496451'
       value:
         font:
           size: 36
           weight: 700
-          color: '#17324F'
+          color: '#005A20'
 
 queries:
   cdo_summary:
@@ -44,12 +44,12 @@ charts:
     query: cdo_summary
     value: total_profit_loss
     style:
-      background: '#EAF3FA'
+      background: '#EAF7EB'
       value:
         format: integer
         font:
           size: 44
-          color: '#175580'
+          color: '#008A00'
 
   position_count:
     type: kpi
