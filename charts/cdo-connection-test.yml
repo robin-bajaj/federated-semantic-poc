@@ -36,6 +36,28 @@ queries:
         SUM(profit_loss) AS total_profit_loss,
         AVG(profit_loss) AS average_profit_loss
       FROM dbt_federated_poc.fct_cdo_positions
+  pnl_by_team:
+    sql: |
+      SELECT
+        source_team AS business_team,
+        SUM(profit_loss) AS profit_loss
+      FROM dbt_federated_poc.fct_cdo_positions
+      GROUP BY source_team
+      ORDER BY profit_loss DESC
+    formats:
+      profit_loss: number_full
+  pnl_by_instrument:
+    sql: |
+      SELECT
+        COALESCE(i.instrument_type, 'Unmapped') AS instrument_type,
+        SUM(p.profit_loss) AS profit_loss
+      FROM dbt_federated_poc.fct_cdo_positions p
+      LEFT JOIN dbt_federated_poc.dim_cdo_instruments i
+        ON p.instrument_id = i.instrument_code
+      GROUP BY COALESCE(i.instrument_type, 'Unmapped')
+      ORDER BY profit_loss DESC
+    formats:
+      profit_loss: number_full
 
 charts:
   total_pnl:
@@ -69,8 +91,31 @@ charts:
       value:
         format: number_full
 
+  pnl_team:
+    type: bar
+    title: P&L by business team
+    query: pnl_by_team
+    x: business_team
+    y: profit_loss
+    style:
+      color:
+        static: '#008A00'
+
+  pnl_instrument:
+    type: bar
+    title: P&L by instrument type
+    query: pnl_by_instrument
+    x: instrument_type
+    y: profit_loss
+    style:
+      color:
+        static: '#008A00'
+
 rows:
   - cols:
       - total_pnl
       - position_count
       - average_pnl
+  - cols:
+      - pnl_team
+      - pnl_instrument
