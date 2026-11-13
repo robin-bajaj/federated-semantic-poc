@@ -1,0 +1,103 @@
+name: CDO Semantic Contract CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate CDO contracts and Meta Context
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR version of dbt project
+        uses: actions/checkout@v4
+        with:
+          path: dbt-project
+          persist-credentials: false
+
+      - name: Checkout extended Meta Context validator
+        uses: actions/checkout@v4
+        with:
+          repository: robin-bajaj/cdo-semantic-contract-validator
+          ref: feature/cdo-contract-validation
+          path: contract-validator
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt and custom validator
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            'dbt-core==1.12.6' \
+            'dbt-postgres==1.11.0' \
+            pytest \
+            ./contract-validator/validator
+
+      - name: Run validator unit tests
+        run: python -m pytest contract-validator/validator/tests -q
+
+      - name: Configure parse-only dbt profile
+        working-directory: dbt-project
+        run: |
+          mkdir -p .ci
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: ci
+                threads: 1
+          PROFILE
+
+      - name: Generate PR manifest without connecting to a warehouse
+        working-directory: dbt-project
+        run: |
+          if [ -f packages.yml ] || [ -f dependencies.yml ]; then
+            dbt deps --profiles-dir .ci
+          fi
+          dbt parse --profiles-dir .ci --no-partial-parse
+          test -s target/manifest.json
+
+      - name: Validate CDO contract and enterprise business context
+        working-directory: dbt-project
+        run: |
+          test -s semantic_contracts/cdo_position_v1.yml
+          test -s models/semantic_models/team_cdo/enterprise_metrics.yml
+          dbt-mc validate models/semantic_models/team_cdo/enterprise_metrics.yml \
+            --contracts semantic_contracts/cdo_position_v1.yml \
+            --manifest target/manifest.json
+
+      - name: Require certified metric context card
+        working-directory: dbt-project
+        run: |
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+          from meta_context_validator.cli import _extract_metrics
+
+          path = Path('models/semantic_models/team_cdo/enterprise_metrics.yml')
+          data = yaml.safe_load(path.read_text()) or {}
+          matching = [
+              meta for name, meta in _extract_metrics(data)
+              if name == 'enterprise_total_profit_loss'
+          ]
+          if len(matching) != 1 or not matching[0].get('context'):
+              raise SystemExit(
+                  'enterprise_total_profit_loss requires one Meta:Context card'
+              )
+          print('Enterprise metric context exists')
+          PY
