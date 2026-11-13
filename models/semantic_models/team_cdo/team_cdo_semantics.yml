@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int_cdo_positions_union
+  - name: fct_cdo_positions
     description: >
       CDO Common Position model combining
       Team A and Team C positions.
@@ -73,14 +73,3 @@ metrics:
 
       - name: cdo_position_count
         alias: position_count
-
-exposures:
-  - name: cdo_enterprise_consumption
-    owner: CDO
-      
-    type: application
-    description: Downstream enterprise application consuming unified EQ and FI positions.
-
-    depends_on:
-      - ref('int_cdo_positions_union')
-      - metric('enterprise_total_profit_loss')

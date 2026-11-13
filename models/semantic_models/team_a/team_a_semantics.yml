@@ -40,8 +40,8 @@ models: # Defines metadata for dbt models
           name: instrument 
           type: foreign
 
-      # - name: profit_loss
-      #   data_type: numeric
+      - name: profit_loss
+        data_type: numeric
 
     metrics:
       - name: equity_profit_loss # Technical metric identifier
