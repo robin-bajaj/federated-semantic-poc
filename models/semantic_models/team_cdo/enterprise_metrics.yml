@@ -21,6 +21,48 @@ metrics:
     
     expr: coalesce(equity_pnl, 0) + coalesce(fi_pnl, 0)
    
+
+    # Green Dot Meta:Context. Context is documentation, not an executable rule.
+    config:
+      meta:
+        context:
+          purpose: >
+            Certified calculation definition for combined Team A Equity and
+            Team C Fixed Income profit and loss.
+          business_question: "What is the enterprise-wide profit or loss?"
+          owner: "CDO"
+        expectations:
+          healthy_range: null
+          warning_threshold: null
+          critical_threshold: null
+          seasonality: "No certified seasonal baseline has been established."
+        investigation:
+          causal_dimensions:
+            - name: "source_team"
+              why: "Separate Team A and Team C contributions to total profit."
+              priority: 1
+          investigation_path: >
+            First verify Team A and Team C source totals and reporting dates;
+            then inspect the contributing position records.
+        relationships:
+          correlates_with:
+            - metric: "equity_profit_loss"
+              relationship: "Equity component of the enterprise metric."
+            - metric: "fixed_income_profit_loss"
+              relationship: "Fixed-income component of the enterprise metric."
+          affected_by:
+            - "Source position valuations"
+            - "Reporting-date coverage"
+        decisions:
+          when_this_drops:
+            - threshold: "No numeric decision threshold is certified."
+              action: "Escalate material unexpected changes to the CDO owner."
+          business_rules:
+            - "Include both Team A and Team C profit/loss contributions."
+            - >
+              No numeric healthy range or alert thresholds have been certified;
+              the null expectation fields intentionally defer to CDO approval.
+
     input_metrics:
       - name: equity_profit_loss
         alias: equity_pnl
