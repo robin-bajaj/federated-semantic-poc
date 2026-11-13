@@ -70,6 +70,7 @@ jobs:
             dbt deps --profiles-dir .ci
           fi
           dbt parse --profiles-dir .ci --no-partial-parse
+          dbt ls --profiles-dir .ci --resource-type model
           test -s target/manifest.json
 
       - name: Validate CDO contract and enterprise business context
@@ -101,3 +102,85 @@ jobs:
               )
           print('Enterprise metric context exists')
           PY
+
+  build_and_test:
+    name: Build and test dbt on temporary PostgreSQL
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dbt_ci
+          POSTGRES_PASSWORD: dbt_ci
+          POSTGRES_DB: dbt_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dbt_ci -d dbt_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout PR version of dbt project
+        uses: actions/checkout@v4
+        with:
+          path: dbt-project
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt Postgres adapter
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'dbt-core==1.12.6' 'dbt-postgres==1.11.0'
+
+      - name: Configure temporary CI database
+        working-directory: dbt-project
+        run: |
+          mkdir -p .ci
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: dbt_ci
+                password: dbt_ci
+                dbname: dbt_ci
+                schema: analytics_ci
+                threads: 4
+          PROFILE
+
+      - name: Install dbt project dependencies
+        working-directory: dbt-project
+        run: |
+          if [ -f packages.yml ] || [ -f dependencies.yml ]; then
+            dbt deps --profiles-dir .ci
+          fi
+
+      - name: Verify temporary PostgreSQL connection
+        working-directory: dbt-project
+        run: dbt debug --profiles-dir .ci --target ci
+
+      - name: Build models, load seeds and run configured dbt tests
+        working-directory: dbt-project
+        run: dbt build --profiles-dir .ci --target ci --full-refresh
+
+      - name: Upload dbt run results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-ci-execution-results
+          if-no-files-found: ignore
+          path: |
+            dbt-project/target/manifest.json
+            dbt-project/target/run_results.json
+            dbt-project/logs/dbt.log
