@@ -41,7 +41,10 @@ models: # Defines metadata for dbt models
           type: foreign
 
       - name: profit_loss
-        data_type: numeric
+        data_type: text
+
+      - name: trade_name
+        data_type: text
 
     metrics:
       - name: equity_profit_loss # Technical metric identifier

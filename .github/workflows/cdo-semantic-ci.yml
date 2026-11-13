@@ -1,9 +1,9 @@
-name: CDO Semantic Contract CI
+name: CDO Semantic Contract CI # Display name shown in GitHub Actions
 
 on:
-  pull_request:
+  pull_request: # Run when a PR targets the repository's main branch
     branches: [main]
-  workflow_dispatch:
+  workflow_dispatch: # Allow someone to trigger the workflow manually
 
 permissions:
   contents: read
@@ -11,14 +11,16 @@ permissions:
 jobs:
   validate:
     name: Validate CDO contracts and Meta Context
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout PR version of dbt project
+    runs-on: ubuntu-latest # GitHub provides a temporary Ubuntu machine called a runner
+    steps: # The remaining steps run on that machine. They are not execute inside dbt Studio
+      # This downloads the dbt project code that GitHub is testing
+      - name: Checkout PR version of dbt project 
         uses: actions/checkout@v4
         with:
           path: dbt-project
           persist-credentials: false
 
+      # This downloads seperate, centrally maintained validator repository at a pinned revision
       - name: Checkout extended Meta Context validator
         uses: actions/checkout@v4
         with:
@@ -27,11 +29,13 @@ jobs:
           path: contract-validator
           persist-credentials: false
 
+      # CI then installs the required tools
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # This installs dbt, the Postgres adapter, pytest, and our customized validator
       - name: Install dbt and custom validator
         run: |
           python -m pip install --upgrade pip
@@ -41,6 +45,7 @@ jobs:
             pytest \
             ./contract-validator/validator
 
+      # This verifies that the validator's Python unit tests pass
       - name: Run validator unit tests
         run: python -m pytest contract-validator/validator/tests -q
 
@@ -63,6 +68,8 @@ jobs:
                 threads: 1
           PROFILE
 
+      # The manifest is very important because Python validator does not need to manually search through Team A's or Team C's SQL files. It reads dbt's parsed project metadata instead
+      # No database connection or SQL execution is needed for this step. It verifies parsed declarations, not physical warehouse data
       - name: Generate PR manifest without connecting to a warehouse
         working-directory: dbt-project
         run: |
@@ -72,6 +79,7 @@ jobs:
           dbt parse --profiles-dir .ci --no-partial-parse
           test -s target/manifest.json
 
+      #If a mandatory column is missing, or a required Meta:Context rule fails, the command retruns a nonzero exit code and GitHub Actions marks the job as failed
       - name: Validate CDO contract and enterprise business context
         working-directory: dbt-project
         run: |
@@ -81,6 +89,8 @@ jobs:
             --contracts ../contract-validator/contracts/cdo/position_v1.yml \
             --manifest target/manifest.json
 
+      # Checks that the CDO metric actually has Meta:Context
+      # This step ensures required enterprise metric is actually present and contains its context block
       - name: Require certified metric context card
         working-directory: dbt-project
         run: |
