@@ -4,7 +4,7 @@
     config(
         materialized='view',
         group='enterprise_cdo',
-        access='private'
+        access='public'
     )
 }}
 
