@@ -1,0 +1,103 @@
+name: CDO Semantic Contract CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate CDO contracts and Meta Context
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout federated dbt project (PR version)
+        uses: actions/checkout@v4
+        with:
+          path: dbt-project
+          persist-credentials: false
+
+      - name: Checkout extended validator
+        uses: actions/checkout@v4
+        with:
+          repository: robin-bajaj/cdo-semantic-contract-validator
+          ref: feature/cdo-contract-validation
+          path: contract-validator
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dbt and the extended validator
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            'dbt-core==1.12.6' \
+            'dbt-postgres==1.11.0' \
+            pytest \
+            ./contract-validator/validator
+
+      - name: Run validator unit tests
+        run: python -m pytest contract-validator/validator/tests -q
+
+      - name: Configure a no-credentials parse profile
+        working-directory: dbt-project
+        run: |
+          mkdir -p .ci
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: ci
+                threads: 1
+          PROFILE
+
+      - name: Parse PR version of dbt models
+        working-directory: dbt-project
+        run: |
+          dbt --version
+          dbt deps --profiles-dir .ci
+          dbt parse --profiles-dir .ci --no-partial-parse
+          test -s target/manifest.json
+
+      - name: Ensure metric context is actually present
+        working-directory: dbt-project
+        run: |
+          python - <<'PYCODE'
+          from pathlib import Path
+          import yaml
+          from meta_context_validator.cli import _extract_metrics
+
+          cards = []
+          files = list(Path("models").rglob("*.yml")) + list(Path("models").rglob("*.yaml"))
+          for file in files:
+              content = yaml.safe_load(file.read_text()) or {}
+              if isinstance(content, dict):
+                  cards.extend(_extract_metrics(content))
+          if not cards or not any(meta.get("context") for _, meta in cards):
+              raise SystemExit("No metrics with Meta:Context found in models/. Add one before enabling CI.")
+          print(f"Found {len(cards)} metric definitions for Meta:Context validation")
+          PYCODE
+
+      - name: Validate Meta Context and CDO contract
+        working-directory: dbt-project
+        run: |
+          test -f semantic_contracts/cdo_position_v1.yml || {
+            echo '::error::Missing semantic_contracts/cdo_position_v1.yml'
+            exit 1
+          }
+          dbt-mc validate models/ \
+            --contracts semantic_contracts/cdo_position_v1.yml \
+            --manifest target/manifest.json
