@@ -3,6 +3,10 @@ version: 2
 models:
   - name: stg_team_b_instruments
     description: "Team B's instrument reference model."
+    
+    config: 
+      group: lob_team_b
+      access: protected
 
     semantic_model:
       enabled: true

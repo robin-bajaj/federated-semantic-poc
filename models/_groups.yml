@@ -1,0 +1,24 @@
+# Defines the organizational ownership groups
+
+version: 2
+
+groups:
+  - name: lob_team_a
+    owner:
+      name: Team A
+
+  - name: lob_team_b
+    owner:
+      name: AD-LOB-TEAM-B
+
+  - name: lob_team_c
+    owner:
+      name: Team C
+
+  - name: enterprise_cdo
+    owner:
+      name: CDO Team
+
+  - name: lob_team_d
+    owner:
+      name: Team D

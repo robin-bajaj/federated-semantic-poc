@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: stg_eq_transaction
+    description: >
+      One row per EQ transaction.
+      Each transaction belongs to an account.
+
+    semantic_model:
+      enabled: true
+      name: team_eq_transaction
+
+    columns:
+      - name: transaction_id
+        data_type: text
+        entity:
+          name: team_eq_transaction_id
+          type: primary
+        data_tests:
+          - not_null
+          - unique
+
+      - name: account_id
+        data_type: text
+        entity:
+          name: team_eq_account_id
+          type: foreign
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_eq_account')
+                field: account_id
+
+      - name: transaction_type
+        data_type: text
+        dimension:
+          type: categorical

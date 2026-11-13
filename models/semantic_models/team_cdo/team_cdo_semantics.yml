@@ -1,14 +1,18 @@
 version: 2
 
 models:
-  - name: fct_cdo_positions
+  - name: int_cdo_positions_union
     description: >
       CDO Common Position model combining
       Team A and Team C positions.
-
+    # config: 
+    #   group: enterprise_cdo
+    #   access: private
+    
     semantic_model:
       enabled: true
       name: team_cdo_positions
+      group: enterprise_cdo
 
     agg_time_dimension: report_date
 
@@ -17,6 +21,9 @@ models:
         entity:
           name: cdo_position
           type: primary
+
+      # - name: position_id
+      #   reference: team_a_semantics.position_id
 
       - name: report_date
         granularity: day
@@ -44,3 +51,36 @@ models:
         type: simple
         agg: count
         expr: cdo_position_key
+
+metrics:
+  - name: enterprise_avg_profit_loss_per_position
+    label: Enterprise Average Profit and Loss per Position
+    description: >
+      Average enterprise Profit and Loss per position.
+      Reuses the enterprise metric composed from
+      Team A and Team C, and the position count
+      defined on the CDO common Position model.
+
+    type: derived
+
+    expr: >
+      coalesce(enterprise_pnl, 0) * 1.0
+      / nullif(position_count, 0)
+
+    input_metrics:
+      - name: enterprise_total_profit_loss
+        alias: enterprise_pnl
+
+      - name: cdo_position_count
+        alias: position_count
+
+exposures:
+  - name: cdo_enterprise_consumption
+    owner: CDO
+      
+    type: application
+    description: Downstream enterprise application consuming unified EQ and FI positions.
+
+    depends_on:
+      - ref('int_cdo_positions_union')
+      - metric('enterprise_total_profit_loss')

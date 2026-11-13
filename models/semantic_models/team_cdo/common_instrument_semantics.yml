@@ -7,6 +7,10 @@ models:
       CDO Common Instrument semantic model
       mapped from Team B Instrument data.
 
+    config: 
+      group: enterprise_cdo
+      access: public
+
     semantic_model:
       enabled: true
       name: cdo_common_instrument

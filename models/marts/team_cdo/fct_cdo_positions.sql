@@ -1,4 +1,12 @@
-{{ config(materialized='view') }}
+-- Public
+
+{{
+    config(
+        materialized='view',
+        group='enterprise_cdo',
+        access='private'
+    )
+}}
 
 SELECT
     cdo_position_key,

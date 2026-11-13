@@ -45,51 +45,33 @@ models:
 # ------------------------------------------------------------
 
 vars:
-  cdo_position:
 
+  cdo_minimum_position_contract:
     name: enterprise_position
+    version: "1.0"
+    owner: enterprise_cdo
 
-    description: >
-      Common enterprise Position definition governed by CDO.
-      Team A and Team C provide their own implementations
-      through standardized staging models.
-
-    # --------------------------------------------------------
-    # Common CDO attributes
-    # --------------------------------------------------------
-
-    attributes:
+    required_attributes:
       position_id: text
       report_date: date
-      profit: numeric
-      instrument_code: integer
+      profit_loss: numeric
+      instrument_id: integer
 
-    # --------------------------------------------------------
-    # Team-specific physical mappings
-    # --------------------------------------------------------
+    implementations:
+      - team: lob_team_a
+        model: stg_team_a_positions
+        version: "1.0"
+        mappings:
+          position_id: posId
+          report_date: report_date
+          profit_loss: profit_loss
+          instrument_id: instrument_code
 
-    teams:
-
-      # Team A - Equity Positions
-      - name: team_a
-
-        source_model: team_a_positions
-        staging_model: stg_team_a_positions
-
-        source_columns:
-          position_id: posID
-          report_date: rptDate
-          profit: pnl
-          instrument_code: instrumentID
-
-      # Team C - Fixed Income Positions
-      - name: team_c
-
-        source_model: team_c_positions
-        staging_model: stg_team_c_positions
-
-        source_columns:
+      - team: lob_team_c
+        model: stg_team_c_positions
+        version: "1.0"
+        mappings:
           position_id: posIdentity
-          report_date: rptDate
-          profit: profitloss
-          instrument_code: insCode
+          report_date: report_date
+          profit_loss: profit_loss
+          instrument_id: instrument_code

@@ -1,0 +1,62 @@
+version: 2
+
+models:
+  - name: stg_fi_position
+
+    description: >
+      FI Position model consumed by CDO.
+
+    config:
+      access: public # This controls which other dbt models are allowed to reference this model using ref()
+      materialized: view
+      contract:
+        enforced: true # This tells dbt to validate the structural interface declared for the model when building it
+
+    semantic_model:
+      enabled: true # It tells dbt to register the SQL-backed model as a semantic model for MetricFlow
+      name: team_fi_position
+
+    agg_time_dimension: report_date
+
+    columns:
+      - name: position_id
+        data_type: text
+        entity:
+          name: team_fi_position_id
+          type: primary
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_id
+        data_type: text
+        entity:
+          name: team_fi_customer_id
+          type: foreign
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_fi_customer')
+                field: customer_id
+
+      - name: report_date
+        data_type: date
+        granularity: day
+        dimension:
+          type: time
+        data_tests:
+          - not_null
+
+      - name: profit_loss
+        data_type: numeric(18,2)
+
+    metrics:
+      - name: team_fi_total_profit
+        type: simple
+        label: FI Total Profit
+        agg: sum
+        expr: profit_loss
+
+
+        
