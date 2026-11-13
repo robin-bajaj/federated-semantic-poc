@@ -4,9 +4,13 @@ models: # Defines metadata for dbt models
   - name: stg_team_c_positions
     description: "Team C Fixed Income Position semantic model."
     
-    config: 
+    config:
       group: lob_team_c
       access: protected
+      meta:
+        semantic_contract:
+          implements: cdo.position
+          version: 1
 
     semantic_model:
       enabled: true # Enables the model for the dbt Semantic Layer
