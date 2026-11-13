@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: stg_fi_customer
+    description: One row per FI customer.
+
+    semantic_model:
+      enabled: true
+      name: team_fi_customer
+
+    columns:
+      - name: customer_id
+        data_type: text
+        entity:
+          name: team_fi_customer_id
+          type: primary
+        data_tests:
+          - not_null
+          - unique
+
+      - name: customer_name
+        data_type: text
+        dimension:
+          type: categorical
+
+      - name: customer_segment
+        data_type: text
+        dimension:
+          type: categorical
+

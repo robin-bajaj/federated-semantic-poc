@@ -1,3 +1,5 @@
+-- Actually transform raw columns into standardized columns
+
 SELECT
     "posID"::text AS position_id,
     "rptDate"::date AS report_date,

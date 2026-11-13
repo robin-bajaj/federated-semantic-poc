@@ -3,6 +3,17 @@ version: 2 # dbt properties-file format
 models: # Defines metadata for dbt models
   - name: stg_team_a_positions # Associates this YAML with existing SQL model
     description: "Team A Equity Position semantic model."
+    
+    config: 
+      # Who owns each model
+      group: lob_team_a
+      # Which models are allowed to depend on other model
+      access: protected # Model is referencable by other groups within the same dbt project
+
+      meta:
+        semantic_contract:
+          implements: cdo.position
+          version: 1
 
     semantic_model:
       enabled: true # Enables the model for the dbt Semantic Layer
@@ -12,19 +23,25 @@ models: # Defines metadata for dbt models
 
     columns:
       - name: position_id # Column in the staging model
+        data_type: text
         entity: # Identifies a business object and helps establish relationships between semantic models.
           name: team_a_position # Semantic entity name
           type: primary
 
       - name: report_date # Column in the staging model
+        data_type: date
         granularity: day
         dimension: # Describes a business object and is used to filter or group data.
           type: time
 
       - name: instrument_code # Column in the staging model
+        data_type: integer
         entity:
           name: instrument 
           type: foreign
+
+      # - name: profit_loss
+      #   data_type: numeric
 
     metrics:
       - name: equity_profit_loss # Technical metric identifier
