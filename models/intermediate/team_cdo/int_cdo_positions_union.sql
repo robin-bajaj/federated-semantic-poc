@@ -1,4 +1,13 @@
-{{ config(materialized='view') }}
+-- Model is referencable by same group, eligible for supported cross-project reference
+-- Idea is that CDO hides how it combines Team A / C data but publishes a stable output for downstream consumers.
+
+{{
+    config(
+        materialized='view',
+        group='enterprise_cdo',
+        access='private'
+    )
+}}
 
 SELECT
     'team_a:' || position_id::text AS cdo_position_key,
