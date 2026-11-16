@@ -16,6 +16,8 @@ models:
             position: team_a_position
           metric_aliases:
             cdo.profit_loss: equity_profit_loss
+          metric_labels:
+            cdo.profit_loss: Equity Profit and Loss
     semantic_model:
       enabled: true
       name: team_a_equity_positions
