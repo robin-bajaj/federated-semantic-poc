@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: robin-bajaj/cdo-semantic-contract-validator
-          ref: 313d1044128cfa3ae74191d76ef35b86acfd32f3 # Pinned to tested central-contract validator revision
+          ref: 4cca9ba9a8648e5d0218fa53d1c17324c37c8d39 # Pin registry + generator + validator to reviewed commit
           path: contract-validator
           persist-credentials: false
 
@@ -62,6 +62,29 @@ jobs:
                 schema: ci
                 threads: 1
           PROFILE
+
+      - name: Generate centrally governed team P&L metrics
+        working-directory: dbt-project
+        run: |
+          python -m meta_context_validator.generate_metrics --registry ../contract-validator/metrics --project .
+          python - <<'PY'
+          import yaml
+          from pathlib import Path
+          for team, expected in [
+              ('team_a', 'equity_profit_loss'),
+              ('team_c', 'fixed_income_profit_loss'),
+          ]:
+              filename = Path(f'models/semantic_models/{team}/{team}_semantics.yml')
+              data = yaml.safe_load(filename.read_text())
+              metrics = data['models'][0]['metrics']
+              matches = [m for m in metrics if m.get('name') == expected]
+              assert len(matches) == 1, f'Missing generated {expected}'
+              metric = matches[0]
+              assert (metric['type'], metric['agg'], metric['expr']) == (
+                  'simple', 'sum', 'profit_loss'
+              ), f'Invalid generated P&L for {team}'
+              print(f'{team}: {expected} => SUM(profit_loss)')
+          PY
 
       - name: Generate PR manifest without connecting to a warehouse
         working-directory: dbt-project
