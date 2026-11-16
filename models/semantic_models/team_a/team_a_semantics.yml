@@ -1,31 +1,58 @@
-# Team A owns only the physical model, team-specific fields and metric aliases.
-# CDO Position fields, semantic dimensions, entities and P&L formula are
-# inherited by the custom compiler before dbt parse.
-version: 2
+# Team A's AUTHORED semantic model (the source of truth on main).
+# CDO centrally owns the standard Position columns, semantic relationships,
+# and P&L formula. Team A only specifies its source model, aliases, and additions.
+# This file contains CUSTOM inheritance metadata, so the CDO compiler must run
+# before dbt parses or deploys it; dbt does not natively support "extends".
+version: 2  # dbt properties-file version; NOT the CDO contract version.
+
 models:
+  # Link these semantic properties to Team A's actual dbt staging SQL model.
+  # That SQL normalizes raw fields such as pnl -> profit_loss.
   - name: stg_team_a_positions
     description: Team A Equity Position semantic model.
+
     config:
-      group: lob_team_a
-      access: protected
+      group: lob_team_a  # Team A owns this model.
+      access: protected  # Allow references across dbt groups in this project.
       meta:
+        # CUSTOM declaration interpreted by our Python semantic compiler.
+        # It does not create a dbt-native inheritance relationship by itself.
         semantic_inheritance:
-          extends: cdo.position
-          version: 1
+          extends: cdo.position  # Reuse CDO's enterprise Position definition.
+          version: 1  # Adopt exactly version 1; CDO changes require explicit adoption.
+
+          # Rename the parent's semantic ENTITY (not the physical column).
+          # CDO defines entity "position" on position_id; Team A's position IDs
+          # are team-specific, so the compiled entity is "team_a_position".
           entity_aliases:
             position: team_a_position
+
+          # Expose the parent's metric under Team A's own metric identifier.
+          # The compiler copies CDO's SUM(profit_loss) calculation unchanged:
+          # cdo.profit_loss -> equity_profit_loss.
           metric_aliases:
             cdo.profit_loss: equity_profit_loss
+
+          # User-facing label for the inherited metric (not its SQL formula).
+          # Team A and Team C need distinct metric labels for dbt parsing.
           metric_labels:
             cdo.profit_loss: Equity Profit and Loss
+
     semantic_model:
-      enabled: true
-      name: team_a_equity_positions
+      enabled: true  # Include this dbt model in the Semantic Layer.
+      name: team_a_equity_positions  # Name consumers see for Team A's semantic model.
+
+    # Only Team A-specific columns are authored here.
+    # position_id, report_date, profit_loss, instrument_code, their types,
+    # entities/dimensions and agg_time_dimension are inserted from CDO at build.
     columns:
       - name: mtm
         data_type: numeric
       - name: cash
         data_type: numeric
+
+    # Team A may define local metrics that CDO does not provide.
+    # position_id is inherited from CDO and exists after compilation.
     metrics:
       - name: team_a_position_count
         label: Team A Position Count
