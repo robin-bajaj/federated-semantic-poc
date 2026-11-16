@@ -12,6 +12,12 @@ models: # Defines metadata for dbt models
           implements: cdo.position
           version: 1
 
+        metric_bindings:
+          - contract: cdo.profit_loss
+            version: 1
+            metric_name: fixed_income_profit_loss
+            label: Fixed Income Profit and Loss
+
     semantic_model:
       enabled: true # Enables the model for the dbt Semantic Layer
       name: team_c_fi_positions # Gives the semantic model its business-oriented name
@@ -40,17 +46,8 @@ models: # Defines metadata for dbt models
       - name: profit_loss
         data_type: numeric
 
+    # CDO-governed P&L metric is generated before dbt parse.
     metrics:
-      - name: fixed_income_profit_loss # Technical metric identifier
-        label: Fixed Income Profit and Loss # Business-friendly name
-        description: >
-          Net profit or loss across Team C Fixed Income Positions.
-          Positive value represents profit and negative values represent loss.
-        type: simple # Aggregation-based metric
-        agg: sum # Add values together
-        expr: profit_loss # Use the staging column profit_loss
-        fill_nulls_with: 0 # Replace null metric results with zero
-
       - name: team_c_position_count # Technical metric identifier
         label: Team C Position Count # Business-friendly name
         description: "Number of Team C Fixed Income Positions."
