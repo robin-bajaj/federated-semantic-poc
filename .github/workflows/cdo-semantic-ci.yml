@@ -66,9 +66,7 @@ jobs:
       - name: Generate centrally governed team P&L metrics
         working-directory: dbt-project
         run: |
-          python -m meta_context_validator.generate_metrics \\
-            --registry ../contract-validator/metrics \\
-            --project .
+          python -m meta_context_validator.generate_metrics --registry ../contract-validator/metrics --project .
           python - <<'PY'
           import yaml
           from pathlib import Path
