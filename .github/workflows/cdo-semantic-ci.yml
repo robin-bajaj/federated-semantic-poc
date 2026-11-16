@@ -1,10 +1,15 @@
+# Pull-request quality gate for CDO-governed semantic models.
+# It does NOT update GitHub's production branch or deploy to dbt Cloud/Power BI.
 name: CDO Semantic Contract CI
 
+# Run when changes are proposed to main, or when a maintainer starts it manually.
 on:
   pull_request:
     branches: [main]
   workflow_dispatch:
 
+# The validation job only reads Team A/C and CDO Git content.
+# The compiler writes to an ephemeral runner checkout, not to GitHub.
 permissions:
   contents: read
 
@@ -13,12 +18,18 @@ jobs:
     name: Validate CDO contracts and Meta Context
     runs-on: ubuntu-latest
     steps:
+      # Get the proposed dbt project changes into dbt-project/ so we validate
+      # the same Team A/C source YAML and SQL that the PR is introducing.
       - name: Checkout PR version of dbt project
         uses: actions/checkout@v4
         with:
           path: dbt-project
           persist-credentials: false
 
+      # Fetch the separately owned CDO registry, semantic inheritance compiler,
+      # contract validator, and unit tests into contract-validator/.
+      # Pinning to a reviewed commit prevents central definition changes from
+      # silently changing Team A/C semantics during a pull-request run.
       - name: Checkout extended Meta Context validator
         uses: actions/checkout@v4
         with:
@@ -27,11 +38,14 @@ jobs:
           path: contract-validator
           persist-credentials: false
 
+      # Use a consistent Python version for YAML compilation, tests and dbt.
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      # Install pinned dbt Core + Postgres adapter, test tooling and the custom
+      # CDO package. dbt still executes metrics; Python only resolves metadata.
       - name: Install dbt and custom validator
         run: |
           python -m pip install --upgrade pip
@@ -41,9 +55,14 @@ jobs:
             pytest \
             ./contract-validator/cdo/validator
 
+      # Fail early if CDO's inheritance, collision checks or contract logic
+      # regress, before compiling the team's semantic declarations.
       - name: Run validator unit tests
         run: python -m pytest contract-validator/cdo/validator/tests -q
 
+      # dbt parse needs a syntactically valid adapter profile. These dummy
+      # localhost credentials are intentionally not a real database connection:
+      # this CI checks syntax/semantic metadata, NOT warehouse data/results.
       - name: Configure parse-only dbt profile
         working-directory: dbt-project
         run: |
@@ -63,6 +82,12 @@ jobs:
                 threads: 1
           PROFILE
 
+      # Resolve Team A/C's custom semantic_inheritance.extends reference.
+      # The compiler reads CDO's Position fields, entities, dimensions, and
+      # SUM(profit_loss) formula, merges local additions/aliases, and rewrites
+      # the YAML only inside the disposable dbt-project/ checkout.
+      # The Python assertions then verify both teams received the four CDO
+      # columns, report-date dimension, and correct locally named P&L metric.
       - name: Compile inherited CDO Position semantics
         working-directory: dbt-project
         run: |
@@ -86,6 +111,10 @@ jobs:
               print(f'{team}: inherited fields + {expected} => SUM(profit_loss)')
           PY
 
+      # Run dbt's native parser on the expanded (not reference-only) project.
+      # dbt deps installs dependencies if declared. --no-partial-parse avoids
+      # validating against stale cached metadata. This produces manifest.json
+      # and semantic_manifest.json locally but does not publish either.
       - name: Generate PR manifest without connecting to a warehouse
         working-directory: dbt-project
         run: |
@@ -94,7 +123,11 @@ jobs:
           fi
           dbt parse --profiles-dir .ci --no-partial-parse
           test -s target/manifest.json
+          test -s target/semantic_manifest.json
 
+      # Check declared model columns/types and CDO reference/version using
+      # the parsed dbt manifest, and check the enterprise metric's Meta:Context
+      # documentation. This is metadata governance, not financial reconciliation.
       - name: Validate CDO contract and enterprise business context
         working-directory: dbt-project
         run: |
@@ -104,6 +137,8 @@ jobs:
             --contracts ../contract-validator/cdo/definitions/position_v1.yml \
             --manifest target/manifest.json
 
+      # Guard against deleting the mandatory enterprise_total_profit_loss
+      # context card: downstream consumers must keep ownership/purpose metadata.
       - name: Require certified metric context card
         working-directory: dbt-project
         run: |
