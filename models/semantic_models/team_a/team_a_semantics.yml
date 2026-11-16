@@ -15,6 +15,12 @@ models: # Defines metadata for dbt models
           implements: cdo.position
           version: 1
 
+        metric_bindings:
+          - contract: cdo.profit_loss
+            version: 1
+            metric_name: equity_profit_loss
+            label: Equity Profit and Loss
+
     semantic_model:
       enabled: true # Enables the model for the dbt Semantic Layer
       name: team_a_equity_positions # Gives the semantic model its business-oriented name
@@ -43,17 +49,8 @@ models: # Defines metadata for dbt models
       - name: profit_loss
         data_type: numeric
 
+    # CDO-governed P&L metric is generated before dbt parse.
     metrics:
-      - name: equity_profit_loss # Technical metric identifier
-        label: Equity Profit and Loss # Business-friendly name
-        description: >
-          Net profit or loss across Team A equity positions.
-          Positive value represents profit and negative values represen loss.
-        type: simple # Aggregation-based metric
-        agg: sum # Add values together
-        expr: profit_loss # Use the staging column profit_loss
-        fill_nulls_with: 0 # Replace null metric results with zero
-
       - name: team_a_position_count # Technical metric identifier
         label: Team A Position Count # Business-friendly name
         description: "Number of Team A Equity Positions."
