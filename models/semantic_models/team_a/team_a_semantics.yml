@@ -1,62 +1,33 @@
-version: 2 # dbt properties-file format
-
-models: # Defines metadata for dbt models
-  - name: stg_team_a_positions # Associates this YAML with existing SQL model
-    description: "Team A Equity Position semantic model."
-    
-    config: 
-      # Who owns each model
+# Team A owns only the physical model, team-specific fields and metric aliases.
+# CDO Position fields, semantic dimensions, entities and P&L formula are
+# inherited by the custom compiler before dbt parse.
+version: 2
+models:
+  - name: stg_team_a_positions
+    description: Team A Equity Position semantic model.
+    config:
       group: lob_team_a
-      # Which models are allowed to depend on other model
-      access: protected # Model is referencable by other groups within the same dbt project
-
+      access: protected
       meta:
-        semantic_contract:
-          implements: cdo.position
+        semantic_inheritance:
+          extends: cdo.position
           version: 1
-
-
+          entity_aliases:
+            position: team_a_position
+          metric_aliases:
+            cdo.profit_loss: equity_profit_loss
     semantic_model:
-      enabled: true # Enables the model for the dbt Semantic Layer
-      name: team_a_equity_positions # Gives the semantic model its business-oriented name
-
-    agg_time_dimension: report_date # This tells MetricFlow that report_date is a time dimension and the default aggregation time dimension.
-
+      enabled: true
+      name: team_a_equity_positions
     columns:
-      - name: position_id # Column in the staging model
-        data_type: text
-        entity: # Identifies a business object and helps establish relationships between semantic models.
-          name: team_a_position # Semantic entity name
-          type: primary
-
-      - name: report_date # Column in the staging model
-        data_type: date
-        granularity: day
-        dimension: # Describes a business object and is used to filter or group data.
-          type: time
-
-      - name: instrument_code # Column in the staging model
-        data_type: integer
-        entity:
-          name: instrument 
-          type: foreign
-
-      - name: profit_loss
+      - name: mtm
         data_type: numeric
-
-    # This metric-level CDO reference is expanded to native dbt YAML before parse.
+      - name: cash
+        data_type: numeric
     metrics:
-      - name: equity_profit_loss
-        label: Equity Profit and Loss
-        config:
-          meta:
-            metric_contract:
-              implements: cdo.profit_loss
-              version: 1
-
-      - name: team_a_position_count # Technical metric identifier
-        label: Team A Position Count # Business-friendly name
-        description: "Number of Team A Equity Positions."
-        type: simple # Aggregation-based metric
-        agg: count # Add values together
-        expr: position_id # Use the staging column position_id
+      - name: team_a_position_count
+        label: Team A Position Count
+        description: Number of Team A Equity Positions.
+        type: simple
+        agg: count
+        expr: position_id
