@@ -1,59 +1,29 @@
-version: 2 # dbt properties-file format
-
-models: # Defines metadata for dbt models
+# Team C inherits the enterprise Position semantic definition from CDO.
+version: 2
+models:
   - name: stg_team_c_positions
-    description: "Team C Fixed Income Position semantic model."
-    
+    description: Team C Fixed Income Position semantic model.
     config:
       group: lob_team_c
       access: protected
       meta:
-        semantic_contract:
-          implements: cdo.position
+        semantic_inheritance:
+          extends: cdo.position
           version: 1
-
-
+          entity_aliases:
+            position: team_c_position
+          metric_aliases:
+            cdo.profit_loss: fixed_income_profit_loss
     semantic_model:
-      enabled: true # Enables the model for the dbt Semantic Layer
-      name: team_c_fi_positions # Gives the semantic model its business-oriented name
-
-    agg_time_dimension: report_date
-
+      enabled: true
+      name: team_c_fi_positions
     columns:
-      - name: position_id # Column in the staging model
-        data_type: text
-        entity: # Identifies a business object and helps establish relationships between semantic models.
-          name: team_c_position # Semantic entity name
-          type: primary
-
-      - name: report_date # Column in the staging model
-        data_type: date
-        granularity: day
-        dimension: # Describes a business object and is used to filter or group data.
-          type: time
-
-      - name: instrument_code
-        data_type: integer
-        entity:
-          name: instrument
-          type: foreign
-
-      - name: profit_loss
+      - name: settled_cash
         data_type: numeric
-
-    # This metric-level CDO reference is expanded to native dbt YAML before parse.
     metrics:
-      - name: fixed_income_profit_loss
-        label: Fixed Income Profit and Loss
-        config:
-          meta:
-            metric_contract:
-              implements: cdo.profit_loss
-              version: 1
-
-      - name: team_c_position_count # Technical metric identifier
-        label: Team C Position Count # Business-friendly name
-        description: "Number of Team C Fixed Income Positions."
-        type: simple # Aggregation-based metric
-        agg: count # Add values together
-        expr: position_id # Use the staging column position_id
+      - name: team_c_position_count
+        label: Team C Position Count
+        description: Number of Team C Fixed Income Positions.
+        type: simple
+        agg: count
+        expr: position_id
