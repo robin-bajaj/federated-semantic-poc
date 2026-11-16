@@ -1,36 +1,65 @@
-# CDO governance repository layout
+# Unified CDO Position governance and metric-level references
 
-The central repository `robin-bajaj/cdo-semantic-contract-validator` now keeps
-all CDO-specific assets in a single directory:
+All enterprise Position requirements now live in one custom CDO-owned
+specification in the separate central repository:
 
 ```text
 cdo/
-  contracts/position_v1.yml
-  metrics/profit_loss_v1.yml
+  definitions/
+    position_v1.yml                 # required_columns + metrics (one file)
   validator/
-    pyproject.toml
     meta_context_validator/
-      cli.py
       contract_rules.py
-      rules.py
       metric_generator.py
       generate_metrics.py
+      cli.py
+      rules.py
     tests/
 ```
 
-GitHub Actions checks out the CDO repository beside the dbt project and pins
-a specific revision of this layout:
+This `position_v1.yml` file is **not** a native standalone dbt semantic
+model. It is the central governance definition which our custom validator
+and pre-parse generator read. The fields `position_id`, `report_date`,
+`profit_loss` and `instrument_code` are required; the common
+`cdo.profit_loss` metric aggregates standardized values using
+`SUM(profit_loss)`.
 
-- Install: `./contract-validator/cdo/validator`
-- Unit tests: `contract-validator/cdo/validator/tests`
-- Metric registry: `../contract-validator/cdo/metrics`
-- Position contract: `../contract-validator/cdo/contracts/position_v1.yml`
+Team A and Team C declare their **model-level** Position compliance under
+`config.meta.semantic_contract`. Their **metric-level** references now
+sit under the actual `metrics:` list:
 
-The workflow runs the generator before `dbt parse`. The `dbt-mc` CLI entry
-point and Python imports remain the same because the package name
-`meta_context_validator` has not changed.
+```yaml
+metrics:
+  - name: equity_profit_loss
+    label: Equity Profit and Loss
+    config:
+      meta:
+        metric_contract:
+          implements: cdo.profit_loss
+          version: 1
+```
 
-**Note:** This reorganizes files but does not add native metric inheritance.
-The custom generator modifies the checked-out team semantic YAML and is
-currently run by GitHub Actions. To parse locally or in dbt Studio, generated
-metric declarations must be available before dbt parse.
+The generator fills in `type: simple`, `agg: sum`, `expr: profit_loss`
+and `fill_nulls_with: 0` before dbt parses the project. The central
+specification is the single source of the common calculation.
+
+The GitHub Actions workflow checks out a pinned CDO repository revision,
+installs `./contract-validator/cdo/validator`, runs tests, and then:
+
+```bash
+python -m meta_context_validator.generate_metrics \
+  --registry ../contract-validator/cdo/definitions/position_v1.yml \
+  --project .
+
+dbt parse --profiles-dir .ci --no-partial-parse
+
+dbt-mc validate models/semantic_models/team_cdo/enterprise_metrics.yml \
+  --contracts ../contract-validator/cdo/definitions/position_v1.yml \
+  --manifest target/manifest.json
+```
+
+**dbt Studio limitation:** raw team YAML containing only metric-level
+contract references cannot be parsed as complete dbt metrics until
+generation runs. Our CI does generation in a temporary checkout; it does not
+commit the generated YAML. A separate generated-artifact publishing mechanism
+would be needed for immediate dbt Studio parsing without local generation.
