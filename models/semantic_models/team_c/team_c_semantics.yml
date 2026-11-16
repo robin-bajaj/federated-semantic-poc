@@ -12,11 +12,6 @@ models: # Defines metadata for dbt models
           implements: cdo.position
           version: 1
 
-        metric_bindings:
-          - contract: cdo.profit_loss
-            version: 1
-            metric_name: fixed_income_profit_loss
-            label: Fixed Income Profit and Loss
 
     semantic_model:
       enabled: true # Enables the model for the dbt Semantic Layer
@@ -46,8 +41,16 @@ models: # Defines metadata for dbt models
       - name: profit_loss
         data_type: numeric
 
-    # CDO-governed P&L metric is generated before dbt parse.
+    # This metric-level CDO reference is expanded to native dbt YAML before parse.
     metrics:
+      - name: fixed_income_profit_loss
+        label: Fixed Income Profit and Loss
+        config:
+          meta:
+            metric_contract:
+              implements: cdo.profit_loss
+              version: 1
+
       - name: team_c_position_count # Technical metric identifier
         label: Team C Position Count # Business-friendly name
         description: "Number of Team C Fixed Income Positions."
