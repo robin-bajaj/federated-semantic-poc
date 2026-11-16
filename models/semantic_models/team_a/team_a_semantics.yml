@@ -42,7 +42,10 @@ models: # Defines metadata for dbt models
           type: foreign
 
       - name: profit_loss
-        data_type: numeric
+        data_type: text
+
+      - name: trade_name
+        data_type: text
 
     # This metric-level CDO reference is expanded to native dbt YAML before parse.
     metrics:
