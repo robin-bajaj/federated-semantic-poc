@@ -1,0 +1,113 @@
+name: Publish Compiled CDO Semantic Models (Manual)
+
+# This workflow prepares a native dbt deployment branch. It DOES NOT trigger
+# a dbt Cloud deployment or activate the production Semantic Layer by itself.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-compiled-semantic-models
+  cancel-in-progress: false
+
+jobs:
+  compile-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout authoritative Team A/C dbt source
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: dbt-project
+          fetch-depth: 0
+
+      - name: Checkout pinned CDO definition and compiler (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: robin-bajaj/cdo-semantic-contract-validator
+          ref: 83af8d898654ada041f87a40f622fe7646dbca80
+          path: contract-validator
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt and the CDO validator
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'dbt-core==1.12.6' 'dbt-postgres==1.11.0' pytest ./contract-validator/cdo/validator
+
+      - name: Run compiler unit tests
+        run: python -m pytest contract-validator/cdo/validator/tests -q
+
+      - name: Compile the complete semantic model in this release workspace
+        working-directory: dbt-project
+        run: |
+          python -m meta_context_validator.compile_semantics \
+            --registry ../contract-validator/cdo/definitions/position_v1.yml \
+            --project .
+
+      - name: Validate expanded native dbt project
+        working-directory: dbt-project
+        run: |
+          mkdir -p .ci
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: ci
+                threads: 1
+          PROFILE
+          if [ -f packages.yml ] || [ -f dependencies.yml ]; then
+            dbt deps --profiles-dir .ci
+          fi
+          dbt parse --profiles-dir .ci --no-partial-parse
+          test -s target/semantic_manifest.json
+          dbt-mc validate models/semantic_models/team_cdo/enterprise_metrics.yml \
+            --contracts ../contract-validator/cdo/definitions/position_v1.yml \
+            --manifest target/manifest.json
+
+      - name: Publish generated project on Team A-controlled deployment branch
+        working-directory: dbt-project
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # No external file or generated manifest is pushed into main.
+          # Commit only the two expanded semantic YAML files; all other
+          # dbt project files are inherited from the checked-out main commit.
+          git add models/semantic_models/team_a/team_a_semantics.yml
+          git add models/semantic_models/team_c/team_c_semantics.yml
+          git diff --cached --quiet && { echo "No compiled changes to commit"; exit 1; }
+
+          git commit -m "build: compile CDO Position semantics from main ${SOURCE_COMMIT}"
+          git fetch origin '+refs/heads/generated/production:refs/remotes/origin/generated/production' || true
+          if git rev-parse --verify -q refs/remotes/origin/generated/production >/dev/null; then
+            expected="$(git rev-parse refs/remotes/origin/generated/production)"
+          else
+            expected=""
+          fi
+          # The generated branch is regenerated from main, never edited by hand.
+          # A lease prevents overwriting an unexpected concurrent branch update.
+          git push --force-with-lease="refs/heads/generated/production:${expected}" \
+            origin HEAD:refs/heads/generated/production
+
+      - name: Deployment handoff reminder
+        run: |
+          echo "Compiled Git branch: generated/production"
+          echo "Configure a dbt Cloud production environment to checkout this branch."
+          echo "This workflow does NOT publish the hosted Semantic Layer by itself."
