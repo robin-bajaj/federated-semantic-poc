@@ -39,8 +39,8 @@ jobs:
       - name: Checkout pinned CDO definition and compiler (read-only)
         uses: actions/checkout@v4
         with:
-          repository: robin-bajaj/cdo-semantic-contract-validator
-          ref: 786bbd55e8a01658a1c5a220b572035d52bf4278
+          repository: robin-bajaj/cdo-semantic-governance
+          ref: df929f7bd36fd98882b575903428e5815b82d093
           path: contract-validator
           persist-credentials: false
 
