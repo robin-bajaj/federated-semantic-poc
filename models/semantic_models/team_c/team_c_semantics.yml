@@ -6,6 +6,10 @@ models:
     config:
       group: lob_team_c
       access: protected
+      # Native dbt contract: applies only to this opted-in model.
+      # Inherited CDO columns are expanded before dbt parses/builds.
+      contract:
+        enforced: true
       meta:
         semantic_inheritance:
           extends: cdo.position
