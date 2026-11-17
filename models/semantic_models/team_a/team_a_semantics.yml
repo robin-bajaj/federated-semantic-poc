@@ -23,7 +23,7 @@ models:
         # It does not create a dbt-native inheritance relationship by itself.
         semantic_inheritance:
           extends: cdo.position  # Reuse CDO's enterprise Position definition.
-          version: 2  # Adopt exactly version 1; CDO changes require explicit adoption.
+          version: 1  # Adopt exactly version 1; CDO changes require explicit adoption.
 
           # Rename the parent's semantic ENTITY (not the physical column).
           # CDO defines entity "position" on position_id; Team A's position IDs
