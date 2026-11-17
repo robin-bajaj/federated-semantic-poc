@@ -50,8 +50,6 @@ models:
     # position_id, report_date, profit_loss, instrument_code, their types,
     # entities/dimensions and agg_time_dimension are inserted from CDO at build.
     columns:
-      - name: profit_loss
-        data_type: numeric
       - name: mtm
         data_type: numeric
       - name: cash
