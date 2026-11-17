@@ -159,3 +159,48 @@ jobs:
               )
           print('Enterprise metric context exists')
           PY
+
+      # Native dbt contract enforcement requires a live database. Keep secrets
+      # out of source and skip this credentialed step for fork PRs.
+      - name: Build CDO-governed models with enforced dbt contracts
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        working-directory: dbt-project
+        env:
+          DBT_PG_HOST: ${{ secrets.DBT_PG_HOST }}
+          DBT_PG_PORT: ${{ secrets.DBT_PG_PORT }}
+          DBT_PG_USER: ${{ secrets.DBT_PG_USER }}
+          DBT_PG_PASSWORD: ${{ secrets.DBT_PG_PASSWORD }}
+          DBT_PG_DBNAME: ${{ secrets.DBT_PG_DBNAME }}
+          DBT_PG_SCHEMA: ci_cdo_${{ github.run_id }}_${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          for variable in DBT_PG_HOST DBT_PG_USER DBT_PG_PASSWORD DBT_PG_DBNAME; do
+            if [ -z "${!variable:-}" ]; then
+              echo "::error::Missing repository secret: ${variable}"
+              exit 1
+            fi
+          done
+
+          # Quoted heredoc preserves dbt's Jinja environment lookups, rather
+          # than interpolating credentials directly into the workflow file.
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: "{{ env_var('DBT_PG_HOST') }}"
+                port: "{{ env_var('DBT_PG_PORT', '5432') | int }}"
+                user: "{{ env_var('DBT_PG_USER') }}"
+                password: "{{ env_var('DBT_PG_PASSWORD') }}"
+                dbname: "{{ env_var('DBT_PG_DBNAME') }}"
+                schema: "{{ env_var('DBT_PG_SCHEMA') }}"
+                sslmode: require
+                threads: 2
+          PROFILE
+
+          dbt debug --profiles-dir .ci --connection
+          # Fresh, isolated schema per run; seed the two sources referenced by
+          # Team A/C staging SQL before building their contracted relations.
+          dbt seed --profiles-dir .ci --select team_a_positions team_c_positions
+          dbt build --profiles-dir .ci --select stg_team_a_positions stg_team_c_positions

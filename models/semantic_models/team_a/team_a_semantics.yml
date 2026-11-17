@@ -14,6 +14,10 @@ models:
     config:
       group: lob_team_a  # Team A owns this model.
       access: protected  # Allow references across dbt groups in this project.
+      # Native dbt contract: applies only to this opted-in model.
+      # Inherited CDO columns are expanded before dbt parses/builds.
+      contract:
+        enforced: true
       meta:
         # CUSTOM declaration interpreted by our Python semantic compiler.
         # It does not create a dbt-native inheritance relationship by itself.
