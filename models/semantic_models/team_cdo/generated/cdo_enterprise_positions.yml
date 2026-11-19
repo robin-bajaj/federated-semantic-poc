@@ -59,10 +59,10 @@ models:
     type: simple
     agg: count
     expr: position_id
-
   - name: cdo_equity_total_mtm
     label: CDO Equity Total Mark to Market
-    description: CDO projection of team-owned metric equity_total_mtm; SUM applies only to its source team's non-NULL extension values. POC financial aggregation pending approval.
+    description: CDO projection of team-owned metric equity_total_mtm; SUM applies only to its source
+      team's non-NULL extension values. POC financial aggregation pending approval.
     type: simple
     agg: sum
     expr: mtm
@@ -73,7 +73,8 @@ models:
         source_semantic_model: team_a_equity_positions
   - name: cdo_equity_total_cash
     label: CDO Equity Total Cash
-    description: CDO projection of team-owned metric equity_total_cash; SUM applies only to its source team's non-NULL extension values. POC financial aggregation pending approval.
+    description: CDO projection of team-owned metric equity_total_cash; SUM applies only to its source
+      team's non-NULL extension values. POC financial aggregation pending approval.
     type: simple
     agg: sum
     expr: cash
@@ -84,7 +85,8 @@ models:
         source_semantic_model: team_a_equity_positions
   - name: cdo_fi_total_settled_cash
     label: CDO Fixed Income Total Settled Cash
-    description: CDO projection of team-owned metric fi_total_settled_cash; SUM applies only to its source team's non-NULL extension values. POC financial aggregation pending approval.
+    description: CDO projection of team-owned metric fi_total_settled_cash; SUM applies only to its source
+      team's non-NULL extension values. POC financial aggregation pending approval.
     type: simple
     agg: sum
     expr: settled_cash
