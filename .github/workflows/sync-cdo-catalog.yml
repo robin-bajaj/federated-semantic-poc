@@ -1,6 +1,16 @@
 name: Sync native CDO semantic model
 
+# After approved Team A/C changes merge, compose the new CDO definition.
+# The scheduled run also detects changes in the separate CDO governance repo.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'models/semantic_models/team_a/**'
+      - 'models/semantic_models/team_c/**'
+      - 'models/semantic_models/team_cdo/enterprise_metrics.yml'
+      - 'scripts/generate_cdo_dbt.py'
+      - '.github/workflows/sync-cdo-catalog.yml'
   workflow_dispatch:
   schedule:
     - cron: '15 12 * * 1-5'
