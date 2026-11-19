@@ -34,6 +34,8 @@ def test_cdo_retains_team_approved_metrics_and_null_branches(tmp_path):
     metrics = {m["name"]: m for m in model["metrics"]}
     assert {"cdo_equity_total_mtm", "cdo_equity_total_cash", "cdo_fi_total_settled_cash"} <= set(metrics)
     assert metrics["cdo_equity_total_mtm"]["expr"] == "mtm"
+    assert metrics["cdo_equity_total_mtm"]["label"].startswith("CDO ")
+    assert len({m["label"] for m in metrics.values()}) == len(metrics)
     assert metrics["cdo_fi_total_settled_cash"]["config"]["meta"]["source_team_metric"] == "fi_total_settled_cash"
     sql = (tmp_path / "generated" / "cdo_enterprise_positions.sql").read_text()
     assert "null::numeric as settled_cash" in sql
