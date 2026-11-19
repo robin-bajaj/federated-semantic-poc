@@ -33,3 +33,12 @@ models:
         type: simple
         agg: count
         expr: position_id
+
+      # Team C explicitly owns this aggregation. SUM is provisional for
+      # POC use, pending financial sign-off on currency/date/grain semantics.
+      - name: fi_total_settled_cash
+        label: Fixed Income Total Settled Cash
+        description: POC total settled cash of Team C positions at the requested reporting grain.
+        type: simple
+        agg: sum
+        expr: settled_cash
