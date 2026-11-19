@@ -19,21 +19,13 @@ jobs:
           ref: main
           persist-credentials: true
 
-      - name: Download published, validated CDO catalog
-        run: |
-          set -euo pipefail
-          curl --fail --location --retry 3 \
-            "https://raw.githubusercontent.com/robin-bajaj/cdo-semantic-governance/main/cdo/generated/position/v1/cdo_enterprise_positions.yml" \
-            --output /tmp/cdo_enterprise_positions.yml
-
-      - name: Install dependencies and generate dbt-native SQL/YAML
+      - name: Install compiler, dbt, and parser dependencies
         run: |
           python -m pip install 'PyYAML>=6.0' 'dbt-core==1.12.6' 'dbt-postgres==1.11.0'
-          python scripts/generate_cdo_dbt.py \
-            --catalog /tmp/cdo_enterprise_positions.yml \
-            --out models/semantic_models/team_cdo/generated
+          git clone --depth 1 https://github.com/robin-bajaj/cdo-semantic-governance.git /tmp/cdo-validator
+          python -m pip install /tmp/cdo-validator/cdo/validator
 
-      - name: Validate generated dbt model
+      - name: Configure parse-only profile
         run: |
           mkdir -p .ci
           cat > .ci/profiles.yml <<'PROFILE'
@@ -50,26 +42,44 @@ jobs:
                 schema: ci
                 threads: 1
           PROFILE
-          # Compile authored Team A and C inheritance only in this disposable checkout.
-          git clone --depth 1 https://github.com/robin-bajaj/cdo-semantic-governance.git /tmp/cdo-validator
-          python -m pip install /tmp/cdo-validator/cdo/validator
+
+      - name: Compile source team semantic models
+        run: |
           python -m meta_context_validator.compile_semantics \
             --registry /tmp/cdo-validator/cdo/definitions/position_v1.yml \
             --project .
           dbt parse --profiles-dir .ci --no-partial-parse
+
+      - name: Compose validated catalog from latest Team A and Team C
+        run: |
+          python -m meta_context_validator.compose_cdo \
+            --project . \
+            --contract /tmp/cdo-validator/cdo/definitions/position_v1.yml \
+            --manifest target/manifest.json \
+            --enterprise-metrics models/semantic_models/team_cdo/enterprise_metrics.yml \
+            --require-semantic-model team_a_equity_positions \
+            --require-semantic-model team_c_fi_positions \
+            --output /tmp/current_cdo_catalog.yml
+
+      - name: Generate and parse dbt-native CDO semantics
+        run: |
+          python scripts/generate_cdo_dbt.py \
+            --catalog /tmp/current_cdo_catalog.yml \
+            --out models/semantic_models/team_cdo/generated
+          dbt parse --profiles-dir .ci --no-partial-parse
           test -s target/manifest.json
           test -s target/semantic_manifest.json
 
-      - name: Open PR when native model changes
+      - name: Open PR if native CDO files changed
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           dir="models/semantic_models/team_cdo/generated"
-          # Revert in-run authored Team A/C modifications; publish only generated CDO outputs.
+          # Keep team sources authored; never publish in-run inherited expansions.
           git restore models/semantic_models/team_a models/semantic_models/team_c
           if [ -z "$(git status --porcelain -- "$dir")" ]; then
-            echo "Native CDO semantic model is already current"
+            echo "Native CDO semantics already current"
             exit 0
           fi
           branch="automation/sync-native-cdo-semantic-model"
@@ -77,10 +87,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$branch"
           git add "$dir"
-          git commit -m "chore(cdo): regenerate native Position semantic model"
+          git commit -m "chore(cdo): regenerate governed enterprise metrics"
           git push --force-with-lease origin "$branch"
           if ! gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number' | grep -q .; then
             gh pr create --base main --head "$branch" \
-              --title "Sync dbt-native generated CDO Position model" \
-              --body "Generated from validated CDO catalog; native dbt SQL and YAML parsed in CI. Team-owned metrics remain on their semantic models."
+              --title "Sync dbt-native CDO metrics from Team A/C semantics" \
+              --body "Compiled and validated current team source definitions, then generated the CDO SQL/YAML and passed dbt parse. Team-owned files are unchanged."
           fi

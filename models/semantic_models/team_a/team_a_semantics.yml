@@ -64,3 +64,21 @@ models:
         type: simple
         agg: count
         expr: position_id
+
+      # Team-owned financial metrics: explicitly declared aggregations,
+      # not inferred by the CDO generator from numeric data types.
+      # SUM is a POC assumption; financial owners must approve the grain,
+      # currency, and date-filtering semantics before production certification.
+      - name: equity_total_mtm
+        label: Equity Total Mark to Market
+        description: POC total MTM of Team A positions at the requested reporting grain.
+        type: simple
+        agg: sum
+        expr: mtm
+
+      - name: equity_total_cash
+        label: Equity Total Cash
+        description: POC total Cash of Team A positions at the requested reporting grain.
+        type: simple
+        agg: sum
+        expr: cash
