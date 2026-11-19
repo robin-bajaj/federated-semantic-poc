@@ -1,0 +1,75 @@
+name: Sync generated CDO catalog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 12 * * 1-5'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dbt project
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Download published CDO catalog
+        run: |
+          set -euo pipefail
+          mkdir -p models/semantic_models/team_cdo/generated
+          curl --fail --location --retry 3 \
+            "https://raw.githubusercontent.com/robin-bajaj/cdo-semantic-governance/main/cdo/generated/position/v1/cdo_enterprise_positions.yml" \
+            --output /tmp/cdo_enterprise_positions.yml
+
+      - name: Check provenance and preserve catalog
+        run: |
+          python -m pip install 'PyYAML>=6.0'
+          python - <<'PY'
+          from pathlib import Path
+          import yaml
+          source = Path("/tmp/cdo_enterprise_positions.yml").read_text(encoding="utf-8")
+          data = yaml.safe_load(source)
+          if data.get("catalog_format") != "cdo-federated-semantic-catalog/v1":
+              raise SystemExit("Refusing incompatible CDO catalog format")
+          if data.get("contract") != {"name": "cdo.position", "version": 1}:
+              raise SystemExit("Refusing incompatible CDO contract")
+          actual = {x["semantic_model"] for x in data.get("implementations", [])}
+          if not {"team_a_equity_positions", "team_c_fi_positions"} <= actual:
+              raise SystemExit("Refusing incomplete Team A/C composition")
+          dest = Path("models/semantic_models/team_cdo/generated/cdo_enterprise_positions.catalog.txt")
+          dest.write_text(
+              "# AUTO-GENERATED SNAPSHOT — DO NOT EDIT\n"
+              "# Source: robin-bajaj/cdo-semantic-governance/cdo/generated/position/v1/cdo_enterprise_positions.yml\n"
+              "# Custom CDO composition metadata (YAML); NOT dbt-native model YAML.\n"
+              + source, encoding="utf-8"
+          )
+          PY
+
+      - name: Open review PR if catalog changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          file="models/semantic_models/team_cdo/generated/cdo_enterprise_positions.catalog.txt"
+          if git diff --quiet -- "$file"; then
+            echo "CDO catalog is already current"
+            exit 0
+          fi
+          branch="automation/sync-cdo-enterprise-catalog"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add "$file"
+          git commit -m "chore(cdo): sync generated enterprise semantic catalog"
+          git push --force-with-lease origin "$branch"
+          if ! gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number' | grep -q .; then
+            gh pr create --base main --head "$branch" \
+              --title "Sync validated CDO semantic composition catalog" \
+              --body "Automated snapshot from the published CDO validator catalog. This is custom, non-dbt YAML stored with a .txt extension to avoid dbt parsing. Please review before merging."
+          fi
