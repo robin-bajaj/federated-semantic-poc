@@ -131,7 +131,7 @@ def generate(catalog_path, output_directory):
             generated_names.add(name)
             metrics.append({
                 "name": name,
-                "label": source_metric.get("label") or name,
+                "label": "CDO " + (source_metric.get("label") or name),
                 "description": ("CDO projection of team-owned metric " + source_metric["name"] +
                                 "; SUM applies only to its source team's non-NULL extension values. "
                                 "POC financial aggregation pending approval."),
