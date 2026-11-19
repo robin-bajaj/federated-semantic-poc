@@ -207,4 +207,9 @@ jobs:
           # Fresh, isolated schema per run; seed the two sources referenced by
           # Team A/C staging SQL before building their contracted relations.
           dbt seed --profiles-dir .ci --select team_a_positions team_c_positions
-          dbt build --profiles-dir .ci --select stg_team_a_positions stg_team_c_positions
+          # Build the CDO view and its upstream Team A/C models BEFORE
+          # the reconciliation test queries cdo_enterprise_positions.
+          dbt build --profiles-dir .ci --select +cdo_enterprise_positions
+          # Run the reconciliation explicitly, independent of dbt's indirect
+          # test-selection behavior. A failing comparison blocks CI.
+          dbt test --profiles-dir .ci --select assert_cdo_position_composition
