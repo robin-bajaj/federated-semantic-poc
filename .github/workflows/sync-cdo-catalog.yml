@@ -1,4 +1,4 @@
-name: Sync generated CDO catalog
+name: Sync native CDO semantic model
 
 on:
   workflow_dispatch:
@@ -19,57 +19,68 @@ jobs:
           ref: main
           persist-credentials: true
 
-      - name: Download published CDO catalog
+      - name: Download published, validated CDO catalog
         run: |
           set -euo pipefail
-          mkdir -p models/semantic_models/team_cdo/generated
           curl --fail --location --retry 3 \
             "https://raw.githubusercontent.com/robin-bajaj/cdo-semantic-governance/main/cdo/generated/position/v1/cdo_enterprise_positions.yml" \
             --output /tmp/cdo_enterprise_positions.yml
 
-      - name: Check provenance and preserve catalog
+      - name: Install dependencies and generate dbt-native SQL/YAML
         run: |
-          python -m pip install 'PyYAML>=6.0'
-          python - <<'PY'
-          from pathlib import Path
-          import yaml
-          source = Path("/tmp/cdo_enterprise_positions.yml").read_text(encoding="utf-8")
-          data = yaml.safe_load(source)
-          if data.get("catalog_format") != "cdo-federated-semantic-catalog/v1":
-              raise SystemExit("Refusing incompatible CDO catalog format")
-          if data.get("contract") != {"name": "cdo.position", "version": 1}:
-              raise SystemExit("Refusing incompatible CDO contract")
-          actual = {x["semantic_model"] for x in data.get("implementations", [])}
-          if not {"team_a_equity_positions", "team_c_fi_positions"} <= actual:
-              raise SystemExit("Refusing incomplete Team A/C composition")
-          dest = Path("models/semantic_models/team_cdo/generated/cdo_enterprise_positions.catalog.txt")
-          dest.write_text(
-              "# AUTO-GENERATED SNAPSHOT — DO NOT EDIT\n"
-              "# Source: robin-bajaj/cdo-semantic-governance/cdo/generated/position/v1/cdo_enterprise_positions.yml\n"
-              "# Custom CDO composition metadata (YAML); NOT dbt-native model YAML.\n"
-              + source, encoding="utf-8"
-          )
-          PY
+          python -m pip install 'PyYAML>=6.0' 'dbt-core==1.12.6' 'dbt-postgres==1.11.0'
+          python scripts/generate_cdo_dbt.py \
+            --catalog /tmp/cdo_enterprise_positions.yml \
+            --out models/semantic_models/team_cdo/generated
 
-      - name: Open review PR if catalog changed
+      - name: Validate generated dbt model
+        run: |
+          mkdir -p .ci
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                port: 5432
+                user: ci
+                password: ci
+                dbname: ci
+                schema: ci
+                threads: 1
+          PROFILE
+          # Compile authored Team A and C inheritance only in this disposable checkout.
+          git clone --depth 1 https://github.com/robin-bajaj/cdo-semantic-governance.git /tmp/cdo-validator
+          python -m pip install /tmp/cdo-validator/cdo/validator
+          python -m meta_context_validator.compile_semantics \
+            --registry /tmp/cdo-validator/cdo/definitions/position_v1.yml \
+            --project .
+          dbt parse --profiles-dir .ci --no-partial-parse
+          test -s target/manifest.json
+          test -s target/semantic_manifest.json
+
+      - name: Open PR when native model changes
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          file="models/semantic_models/team_cdo/generated/cdo_enterprise_positions.catalog.txt"
-          if git diff --quiet -- "$file"; then
-            echo "CDO catalog is already current"
+          dir="models/semantic_models/team_cdo/generated"
+          # Revert in-run authored Team A/C modifications; publish only generated CDO outputs.
+          git restore models/semantic_models/team_a models/semantic_models/team_c
+          if [ -z "$(git status --porcelain -- "$dir")" ]; then
+            echo "Native CDO semantic model is already current"
             exit 0
           fi
-          branch="automation/sync-cdo-enterprise-catalog"
+          branch="automation/sync-native-cdo-semantic-model"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$branch"
-          git add "$file"
-          git commit -m "chore(cdo): sync generated enterprise semantic catalog"
+          git add "$dir"
+          git commit -m "chore(cdo): regenerate native Position semantic model"
           git push --force-with-lease origin "$branch"
           if ! gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number' | grep -q .; then
             gh pr create --base main --head "$branch" \
-              --title "Sync validated CDO semantic composition catalog" \
-              --body "Automated snapshot from the published CDO validator catalog. This is custom, non-dbt YAML stored with a .txt extension to avoid dbt parsing. Please review before merging."
+              --title "Sync dbt-native generated CDO Position model" \
+              --body "Generated from validated CDO catalog; native dbt SQL and YAML parsed in CI. Team-owned metrics remain on their semantic models."
           fi
