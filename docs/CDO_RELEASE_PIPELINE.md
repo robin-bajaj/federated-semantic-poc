@@ -1,26 +1,66 @@
-# CDO Semantic Release Pipeline
+# CDO CI → Sync → Release
 
-The automated release workflow is `.github/workflows/cdo-semantic-release.yml`.
+This project has three primary GitHub Actions workflows, plus one optional
+manual publishing workflow for a separate dbt Cloud integration approach.
 
-## Workflow and ownership
+## Primary path
 
-- **PR:** compile CDO v1 inheritance into Team A/Team C, run validator tests, dbt parse and metadata validation, compose the CDO catalog, regenerate native CDO `*.sql` and `*.yml` and verify they exactly match the committed reviewed artifacts. No database write.
-- **If generated files are stale:** run the existing `Sync native CDO semantic model` workflow, review and merge the generated-file PR, then re-run validation.
-- **On main:** repeat the same validation, then deploy only after the protected GitHub Environment `cdo-release` authorizes the job.
-- **Build:** `dbt build --select +cdo_enterprise_positions` builds its selected dependencies and CDO logical PostgreSQL view.
-- **Reconciliation:** `dbt test --select assert_cdo_position_composition` compares row counts and approved financial column totals against team-owned staging sources.
-- **Artifacts:** manifest, semantic_manifest and run_results retained in GitHub Actions.
+1. **CI — `cdo-semantic-ci.yml`:** Every pull request targeting `main`
+   compiles the short Team A/C authored inheritance YAML in an ephemeral
+   checkout, runs validator tests, parses native dbt semantics, and builds the
+   CDO view plus reconciliation test in an isolated Neon CI schema for
+   same-repository PRs. CI never publishes to the release schema.
+2. **Sync — `sync-cdo-catalog.yml`:** After a successful Team A/C change
+   is *merged to main*, a path-filtered push starts the generator.
+   It compiles current Team A/C YAML, composes the validated CDO catalog,
+   regenerates `cdo_enterprise_positions.sql` and
+   `cdo_enterprise_positions.yml`, parses them, and opens a **review PR**
+   only if the generated files differ. Team-owned authored YAML is not
+   committed back. The weekday schedule and manual dispatch also cover
+   changes in the separately governed CDO repository.
+3. **Release — `cdo-semantic-release.yml`:** Review/merge the Sync PR.
+   A generated-CDO-files push to `main` starts release validation.
+   The pipeline regenerates from the same reviewed team sources and fails
+   if committed output differs. After validation, the protected
+   `cdo-release` environment authorizes the Neon deployment.
+   The job builds `+cdo_enterprise_positions` and tests
+   `assert_cdo_position_composition`. A manual dispatch may be used
+   for an approved redeployment.
 
-## One-time GitHub setup
+**Important:** CI, Sync, and Release are independent GitHub Actions triggered
+by Git events/schedule/manual runs. They do not directly call each other.
+Team changes lead to a Sync review PR, not an immediate database release.
+A failed or unmerged Sync PR blocks the normal deployment sequence.
 
-Create a GitHub Environment **cdo-release** with required reviewers and restrict it to `main`. Set the following environment secrets:
+## Optional manual branch publisher
 
-`DBT_PG_HOST`, `DBT_PG_USER`, `DBT_PG_PASSWORD`, `DBT_PG_DBNAME`; optionally `DBT_PG_PORT` (default 5432).
+`.github/workflows/publish-compiled-semantic-models.yml` remains
+**manual-only**, and produces a `generated/production` Git branch containing
+compiled Team A/C semantic YAML. Use it only if a separately configured dbt
+Cloud environment needs that branch; **it is not part of the Neon release
+path**, and does not enable the hosted dbt Semantic Layer.
 
-Set environment variable `DBT_CDO_RELEASE_SCHEMA` to a **dedicated, isolated POC schema**, for example `ci_cdo_poc`. Ensure the Neon PostgreSQL login has permission to create and replace objects there. Never point this deployment at production or a schema used by other dbt jobs without review.
+## One-time protected Neon environment setup
 
-**Important:** This POC includes source `team_a_positions` and `team_c_positions` as dbt seeds. The `+cdo_enterprise_positions` build includes upstream seeds/models and can write seed tables. Use the dedicated POC schema only. Replace seeds with governed live sources before a production release.
+Create a GitHub Environment named **cdo-release** with required reviewers and
+restrict deployment to `main`. Configure environment secrets:
 
-This workflow does not set up hosted dbt Semantic Layer access or publish directly to a BI connector. The result is a built CDO view in Neon and a validated semantic manifest. Hosted Semantic Layer connectivity requires separate dbt account/service configuration.
+- `DBT_PG_HOST`, `DBT_PG_USER`, `DBT_PG_PASSWORD`, `DBT_PG_DBNAME`
+- `DBT_PG_PORT` (optional; default 5432)
 
-The comparison is structural/value reconciliation; it does not certify business-level FX conversion or correct aggregation of snapshots across dates. That requires future finance-approved test cases.
+Set `DBT_CDO_RELEASE_SCHEMA` as an environment variable for a dedicated,
+isolated POC schema, e.g. `ci_cdo_poc`; the Neon user needs access to create
+objects in this schema. The current POC builds upstream dbt seeds in addition
+to views, so **do not use a shared production schema**.
+
+Outputs are Neon database objects and GitHub Actions manifest artifacts;
+this is **not** a hosted dbt Semantic Layer deployment or direct Power BI
+publication. Business certification of currency and as-of-date aggregation
+semantics remains separate from structural/data reconciliation.
+
+## Existing limitation
+
+The original CI/optional Publish workflows pin a reviewed CDO governance
+commit, whereas Sync/Release check out CDO governance `main`.
+For future enterprise use, pin all jobs to one reviewed, versioned governance
+artifact to avoid differences between validation and generated releases.
