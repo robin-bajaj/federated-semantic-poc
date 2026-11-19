@@ -60,6 +60,10 @@ jobs:
       - name: Run validator unit tests
         run: python -m pytest contract-validator/cdo/validator/tests -q
 
+      - name: Test native CDO model generator
+        working-directory: dbt-project
+        run: python -m pytest tests/test_generate_cdo_dbt.py -q
+
       # dbt parse needs a syntactically valid adapter profile. These dummy
       # localhost credentials are intentionally not a real database connection:
       # this CI checks syntax/semantic metadata, NOT warehouse data/results.
