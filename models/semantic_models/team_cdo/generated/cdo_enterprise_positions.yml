@@ -1,0 +1,61 @@
+# AUTO-GENERATED; native dbt model + semantic configuration (v1.12+)
+version: 2
+models:
+- name: cdo_enterprise_positions
+  description: CDO unified Position view composed from validated Team A and Team C sources.
+  config:
+    meta:
+      cdo_contract: cdo.position
+      cdo_contract_version: 1
+      composition_sources:
+      - stg_team_a_positions
+      - stg_team_c_positions
+  semantic_model:
+    enabled: true
+    name: cdo_enterprise_positions
+  primary_entity: enterprise_position
+  agg_time_dimension: report_date
+  columns:
+  - name: source_team
+    data_type: text
+    dimension:
+      type: categorical
+  - name: position_id
+    data_type: text
+    dimension:
+      type: categorical
+  - name: report_date
+    data_type: date
+    granularity: day
+    dimension:
+      type: time
+  - name: profit_loss
+    data_type: numeric
+  - name: instrument_code
+    data_type: integer
+    dimension:
+      type: categorical
+    entity:
+      type: foreign
+      name: instrument
+  - name: cash
+    data_type: numeric
+    description: Team-owned extension; NULL when not applicable to the source team.
+  - name: mtm
+    data_type: numeric
+    description: Team-owned extension; NULL when not applicable to the source team.
+  - name: settled_cash
+    data_type: numeric
+    description: Team-owned extension; NULL when not applicable to the source team.
+  metrics:
+  - name: cdo_position_profit_loss
+    label: CDO Position Profit and Loss
+    type: simple
+    agg: sum
+    expr: profit_loss
+  - name: cdo_position_row_count
+    label: CDO Position Row Count
+    description: Number of position rows across team/date; not necessarily distinct enterprise positions.
+    type: simple
+    agg: count
+    expr: position_id
