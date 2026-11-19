@@ -8,15 +8,15 @@ with expected as (
         coalesce(sum(profit_loss), 0)::numeric as pnl,
         coalesce(sum(mtm), 0)::numeric as mtm,
         coalesce(sum(cash), 0)::numeric as cash,
-        null::numeric as settled_cash
+        0::numeric as settled_cash
     from {{ ref('stg_team_a_positions') }}
     union all
     select
         'TEAM_C'::text as source_team,
         count(*)::bigint as row_count,
         coalesce(sum(profit_loss), 0)::numeric as pnl,
-        null::numeric as mtm,
-        null::numeric as cash,
+        0::numeric as mtm,
+        0::numeric as cash,
         coalesce(sum(settled_cash), 0)::numeric as settled_cash
     from {{ ref('stg_team_c_positions') }}
 ),
