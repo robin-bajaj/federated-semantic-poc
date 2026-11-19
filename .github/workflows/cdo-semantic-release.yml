@@ -2,11 +2,20 @@ name: CDO Semantic Model Release
 
 # Every approved change to main goes through the same compile/validate/generate gate.
 # Pull requests are validation-only. Main releases require a protected environment.
+# Run after reviewed, generated CDO artifacts are merged to main.
+# Team changes alone trigger CI and the Sync PR, not a premature deploy.
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'models/semantic_models/team_cdo/generated/**'
+      - 'models/semantic_models/team_cdo/enterprise_metrics.yml'
+      - 'scripts/generate_cdo_dbt.py'
+      - '.github/workflows/cdo-semantic-release.yml'
   push:
     branches: [main]
+    paths:
+      - 'models/semantic_models/team_cdo/generated/**'
   workflow_dispatch:
 
 permissions:
