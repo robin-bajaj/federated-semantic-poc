@@ -109,8 +109,7 @@ def generate(catalog_path, output_directory):
     schema = {"version": 2, "models": [{
         "name": MODEL_NAME,
         "description": "CDO unified Position view composed from validated Team A and Team C sources.",
-        "config": {"group": "enterprise_cdo", "access": "protected",
-                   "meta": {"cdo_contract": "cdo.position", "cdo_contract_version": 1,
+        "config": {"meta": {"cdo_contract": "cdo.position", "cdo_contract_version": 1,
                             "composition_sources": [s for _, s, _ in source_maps]}},
         "semantic_model": {"enabled": True, "name": "cdo_enterprise_positions"},
         "primary_entity": "enterprise_position",
