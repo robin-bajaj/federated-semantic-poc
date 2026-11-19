@@ -106,6 +106,43 @@ def generate(catalog_path, output_directory):
          "description": "Number of position rows across team/date; not necessarily distinct enterprise positions.",
          "type": "simple", "agg": "count", "expr": "position_id"},
     ]
+    # Retain approved TEAM extension metrics by compiling their definitions into
+    # CDO-scoped metric names. Only metrics over extension columns are duplicated
+    # here; inherited/team metrics remain on the original semantic models.
+    # The union view exposes NULL for an extension on non-owning teams, so
+    # SUM(extension) includes contributions from the owning team only.
+    generated_names = {m["name"] for m in metrics}
+    for implementation in implementations:
+        source_columns = {c["name"] for c in implementation.get("columns") or []}
+        for source_metric in implementation.get("metrics") or []:
+            expr = source_metric.get("expr")
+            if expr not in extensions or expr not in source_columns:
+                continue
+            if source_metric.get("type") != "simple":
+                raise ValueError(f"Unsupported team metric type: {source_metric.get('name')}")
+            if source_metric.get("agg") != "sum":
+                raise ValueError(f"Only SUM extension metrics supported: {source_metric.get('name')}")
+            for key in ("filter", "offset_window", "offset_to_grain", "non_additive_dimension"):
+                if source_metric.get(key) is not None:
+                    raise ValueError(f"Cannot safely transfer metric property {key}: {source_metric.get('name')}")
+            name = "cdo_" + _identifier(source_metric["name"])
+            if name in generated_names:
+                raise ValueError(f"Duplicate enterprise metric name: {name}")
+            generated_names.add(name)
+            metrics.append({
+                "name": name,
+                "label": source_metric.get("label") or name,
+                "description": ("CDO projection of team-owned metric " + source_metric["name"] +
+                                "; SUM applies only to its source team's non-NULL extension values. "
+                                "POC financial aggregation pending approval."),
+                "type": "simple",
+                "agg": "sum",
+                "expr": expr,
+                "config": {"meta": {"source_team_metric": source_metric["name"],
+                                    "owner": implementation.get("owner"),
+                                    "source_semantic_model": implementation["semantic_model"]}}
+            })
+
     schema = {"version": 2, "models": [{
         "name": MODEL_NAME,
         "description": "CDO unified Position view composed from validated Team A and Team C sources.",
