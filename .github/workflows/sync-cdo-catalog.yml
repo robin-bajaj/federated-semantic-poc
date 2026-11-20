@@ -1,7 +1,9 @@
-name: Sync native CDO semantic model
+name: Sync CDO Position Snapshot
 
-# After approved Team A/C changes merge, compose the new CDO definition.
-# The scheduled run also detects changes in the separate CDO governance repo.
+# Generate the initial CDO Position snapshot and fully regenerate later revisions.
+# Source of truth: approved Team A/C YAML on main + CDO Position v1 governance.
+# A snapshot is the two reviewed native SQL/YAML files on main (versioned in Git).
+# Never append to the previous snapshot or publish directly to generated/production.
 on:
   push:
     branches: [main]
@@ -18,11 +20,16 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: sync-cdo-position-snapshot
+  cancel-in-progress: false
+
 jobs:
   sync:
+    name: Generate and propose CDO Position snapshot
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout dbt project
+      - name: Checkout approved source on main
         uses: actions/checkout@v4
         with:
           ref: main
@@ -59,7 +66,7 @@ jobs:
             --project .
           dbt parse --profiles-dir .ci --no-partial-parse
 
-      - name: Compose validated catalog from latest Team A and Team C
+      - name: Compose validated CDO Position v1 catalog
         run: |
           python -m meta_context_validator.compose_cdo \
             --project . \
@@ -69,7 +76,7 @@ jobs:
             --require-semantic-model team_c_fi_positions \
             --output /tmp/current_cdo_catalog.yml
 
-      - name: Generate and parse dbt-native CDO semantics
+      - name: Fully regenerate and parse native CDO Position snapshot
         run: |
           python scripts/generate_cdo_dbt.py \
             --catalog /tmp/current_cdo_catalog.yml \
@@ -78,27 +85,81 @@ jobs:
           test -s target/manifest.json
           test -s target/semantic_manifest.json
 
-      - name: Open PR if native CDO files changed
+      - name: Compare snapshot and create or update CDO review PR
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
-          dir="models/semantic_models/team_cdo/generated"
-          # Keep team sources authored; never publish in-run inherited expansions.
-          git restore models/semantic_models/team_a models/semantic_models/team_c
-          if [ -z "$(git status --porcelain -- "$dir")" ]; then
-            echo "Native CDO semantics already current"
+          snapshot_dir="models/semantic_models/team_cdo/generated"
+          snapshot_branch="automation/sync-cdo-position-snapshot"
+          generated_sql="$snapshot_dir/cdo_enterprise_positions.sql"
+          generated_yaml="$snapshot_dir/cdo_enterprise_positions.yml"
+
+          # A complete snapshot is always generated from CURRENT source, not
+          # patched on top of an old generated file. Both artifacts are required.
+          test -s "$generated_sql"
+          test -s "$generated_yaml"
+
+          # The compilation step operates on a disposable checkout. Never
+          # commit expanded Team A/C source declarations back to main.
+          git restore -- models/semantic_models/team_a models/semantic_models/team_c
+
+          # Compare the entire tracked snapshot against the one on main.
+          # This also supports FIRST creation when the files don't yet exist.
+          if [ -z "$(git status --porcelain -- "$snapshot_dir")" ]; then
+            echo "CDO Position snapshot already matches main; no PR needed."
             exit 0
           fi
-          branch="automation/sync-native-cdo-semantic-model"
+
+          source_commit="$(git rev-parse HEAD)"
+          governance_commit="$(git -C /tmp/cdo-validator rev-parse HEAD)"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B "$branch"
-          git add "$dir"
-          git commit -m "chore(cdo): regenerate governed enterprise metrics"
-          git push --force-with-lease origin "$branch"
-          if ! gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number' | grep -q .; then
-            gh pr create --base main --head "$branch" \
-              --title "Sync dbt-native CDO metrics from Team A/C semantics" \
-              --body "Compiled and validated current team source definitions, then generated the CDO SQL/YAML and passed dbt parse. Team-owned files are unchanged."
+
+          # This automation branch is disposable. Never modify main or
+          # generated/production directly; merge the reviewed snapshot PR.
+          git checkout -B "$snapshot_branch"
+          git add -A -- "$snapshot_dir"
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(cdo): refresh Position v1 semantic snapshot"
+
+          # Lease protects any unexpected edits to the automation branch.
+          git fetch origin "refs/heads/$snapshot_branch:refs/remotes/origin/$snapshot_branch" || true
+          expected=""
+          if git rev-parse --verify -q "refs/remotes/origin/$snapshot_branch" >/dev/null; then
+            expected="$(git rev-parse "refs/remotes/origin/$snapshot_branch")"
+          fi
+          git push --force-with-lease="refs/heads/$snapshot_branch:$expected" \
+            origin "HEAD:refs/heads/$snapshot_branch"
+
+          pr_number="$(gh pr list --head "$snapshot_branch" --base main --state open --json number --jq '.[0].number')"
+          pr_title="Sync CDO Position Snapshot — Team A + Team C"
+          pr_body="$(cat <<EOF
+          ## Purpose
+          Initial generation or complete replacement of the approved CDO Position v1 snapshot.
+
+          ## Snapshot artifacts
+          - \`$generated_sql\` — UNION ALL view of the governed Team A/C positions.
+          - \`$generated_yaml\` — dbt-native CDO Position entity, dimensions and supported CDO metrics.
+
+          ## Provenance
+          - Federated source commit: \`$source_commit\`
+          - CDO governance commit: \`$governance_commit\`
+          - Governed interface: \`cdo.position\` v1
+          - Generated using the current approved Team A/C semantics; no incremental appending.
+
+          ## Validation and release
+          - Compiled Team A/C inheritance, validated CDO composition, and passed dbt parse.
+          - Only the generated CDO SQL/YAML are committed. Authored Team A/C YAML is unchanged.
+          - Requires review and merge to \`main\` before Release.
+          - Does **not** write \`generated/production\`, deploy Neon, or publish dbt Cloud.
+          EOF
+          )"
+          if [ -z "$pr_number" ]; then
+            gh pr create --base main --head "$snapshot_branch" \
+              --title "$pr_title" --body "$pr_body"
+          else
+            gh pr edit "$pr_number" --title "$pr_title" --body "$pr_body"
+            echo "Updated CDO snapshot PR #$pr_number"
           fi
