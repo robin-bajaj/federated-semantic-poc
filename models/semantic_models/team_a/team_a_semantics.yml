@@ -1,84 +1,84 @@
-# Team A's AUTHORED semantic model (the source of truth on main).
-# CDO centrally owns the standard Position columns, semantic relationships,
-# and P&L formula. Team A only specifies its source model, aliases, and additions.
-# This file contains CUSTOM inheritance metadata, so the CDO compiler must run
-# before dbt parses or deploys it; dbt does not natively support "extends".
-version: 2  # dbt properties-file version; NOT the CDO contract version.
-
+version: 2
 models:
-  # Link these semantic properties to Team A's actual dbt staging SQL model.
-  # That SQL normalizes raw fields such as pnl -> profit_loss.
-  - name: stg_team_a_positions
-    description: Team A Equity Position semantic model.
+- name: stg_team_a_positions
+  description: Team A Equity Position semantic model.
+  config:
+    group: lob_team_a
+    access: protected
+    contract:
+      enforced: true
+    meta:
+      semantic_inheritance:
+        extends: cdo.position
+        version: 1
+        entity_aliases:
+          position: team_a_position
+        metric_aliases:
+          cdo.profit_loss: equity_profit_loss
+        metric_labels:
+          cdo.profit_loss: Equity Profit and Loss
+      semantic_contract:
+        implements: cdo.position
+        version: 1
+  semantic_model:
+    enabled: true
+    name: team_a_equity_positions
+  columns:
+  - name: position_id
+    data_type: text
+    description: Enterprise position identifier
+    entity:
+      name: team_a_position
+      type: primary
+  - name: report_date
+    data_type: date
+    granularity: day
+    dimension:
+      type: time
+  - name: profit_loss
+    data_type: numeric
+    description: Standardized position profit and loss
+  - name: instrument_code
+    data_type: integer
+    entity:
+      name: instrument
+      type: foreign
+  - name: mtm
+    data_type: numeric
+  - name: cash
+    data_type: numeric
+  metrics:
+  - type: simple
+    agg: sum
+    expr: profit_loss
+    fill_nulls_with: 0
+    name: equity_profit_loss
+    label: Equity Profit and Loss
+    description: 'Total position profit and loss measured as the sum of standardized position-level profit_loss
+      values over the query''s dimensions and date.
 
+      '
     config:
-      group: lob_team_a  # Team A owns this model.
-      access: protected  # Allow references across dbt groups in this project.
-      # Native dbt contract: applies only to this opted-in model.
-      # Inherited CDO columns are expanded before dbt parses/builds.
-      contract:
-        enforced: true
       meta:
-        # CUSTOM declaration interpreted by our Python semantic compiler.
-        # It does not create a dbt-native inheritance relationship by itself.
-        semantic_inheritance:
-          extends: cdo.position  # Reuse CDO's enterprise Position definition.
-          version: 1  # Adopt exactly version 1; CDO changes require explicit adoption.
-
-          # Rename the parent's semantic ENTITY (not the physical column).
-          # CDO defines entity "position" on position_id; Team A's position IDs
-          # are team-specific, so the compiled entity is "team_a_position".
-          entity_aliases:
-            position: team_a_position
-
-          # Expose the parent's metric under Team A's own metric identifier.
-          # The compiler copies CDO's SUM(profit_loss) calculation unchanged:
-          # cdo.profit_loss -> equity_profit_loss.
-          metric_aliases:
-            cdo.profit_loss: equity_profit_loss
-
-          # User-facing label for the inherited metric (not its SQL formula).
-          # Team A and Team C need distinct metric labels for dbt parsing.
-          metric_labels:
-            cdo.profit_loss: Equity Profit and Loss
-
-    semantic_model:
-      enabled: true  # Include this dbt model in the Semantic Layer.
-      name: team_a_equity_positions  # Name consumers see for Team A's semantic model.
-
-    # Only Team A-specific columns are authored here.
-    # position_id, report_date, profit_loss, instrument_code, their types,
-    # entities/dimensions and agg_time_dimension are inserted from CDO at build.
-    columns:
-      - name: mtm
-        data_type: numeric
-      - name: cash
-        data_type: numeric
-
-    # Team A may define local metrics that CDO does not provide.
-    # position_id is inherited from CDO and exists after compilation.
-    metrics:
-      - name: team_a_position_count
-        label: Team A Position Count
-        description: Number of Team A Equity Positions.
-        type: simple
-        agg: count
-        expr: position_id
-
-      # Team-owned financial metrics: explicitly declared aggregations,
-      # not inferred by the CDO generator from numeric data types.
-      # SUM is a POC assumption; financial owners must approve the grain,
-      # currency, and date-filtering semantics before production certification.
-      - name: equity_total_mtm
-        label: Equity Total Mark to Market
-        description: POC total MTM of Team A positions at the requested reporting grain.
-        type: simple
-        agg: sum
-        expr: mtm
-
-      - name: equity_total_cash
-        label: Equity Total Cash
-        description: POC total Cash of Team A positions at the requested reporting grain.
-        type: simple
-        agg: sum
-        expr: cash
+        metric_contract:
+          implements: cdo.profit_loss
+          version: 1
+  - name: team_a_position_count
+    label: Team A Position Count
+    description: Number of Team A Equity Positions.
+    type: simple
+    agg: count
+    expr: position_id
+  - name: equity_total_mtm
+    label: Equity Total Mark to Market
+    description: POC total MTM of Team A positions at the requested reporting grain.
+    type: simple
+    agg: sum
+    expr: mtm
+  - name: equity_total_cash
+    label: Equity Total Cash
+    description: POC total Cash of Team A positions at the requested reporting grain.
+    type: simple
+    agg: sum
+    expr: cash
+  agg_time_dimension: report_date
