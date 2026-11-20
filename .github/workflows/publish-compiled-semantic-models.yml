@@ -98,9 +98,6 @@ jobs:
           fi
           dbt parse --profiles-dir .ci --no-partial-parse
           test -s target/semantic_manifest.json
-          dbt-mc validate models/semantic_models/team_cdo/enterprise_metrics.yml \
-            --contracts ../contract-validator/cdo/definitions/position_v1.yml \
-            --manifest target/manifest.json
 
       # ONLY after validation: commit expanded Team A/C YAML to a generated
       # branch. Other project files come from the same checked-out main commit.

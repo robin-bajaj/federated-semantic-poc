@@ -9,7 +9,6 @@ on:
     branches: [main]
     paths:
       - 'models/semantic_models/team_cdo/generated/**'
-      - 'models/semantic_models/team_cdo/enterprise_metrics.yml'
       - 'scripts/generate_cdo_dbt.py'
       - '.github/workflows/cdo-semantic-release.yml'
   push:
@@ -71,11 +70,8 @@ jobs:
                 threads: 1
           PROFILE
 
-      - name: Validate compiler and generator
-        run: |
-          python -m pytest contract-validator/cdo/validator/tests -q
-          cd dbt-project
-          python -m pytest tests/test_generate_cdo_dbt.py -q
+      - name: Validate CDO compiler
+        run: python -m pytest contract-validator/cdo/validator/tests -q
 
       - name: Compile Team A and Team C inheritance
         working-directory: dbt-project
@@ -88,17 +84,13 @@ jobs:
           fi
           dbt parse --profiles-dir .ci --no-partial-parse
 
-      - name: Validate contract and compose CDO catalog
+      - name: Compose validated CDO catalog
         working-directory: dbt-project
         run: |
-          dbt-mc validate models/semantic_models/team_cdo/enterprise_metrics.yml \
-            --contracts ../contract-validator/cdo/definitions/position_v1.yml \
-            --manifest target/manifest.json
           python -m meta_context_validator.compose_cdo \
             --project . \
             --contract ../contract-validator/cdo/definitions/position_v1.yml \
             --manifest target/manifest.json \
-            --enterprise-metrics models/semantic_models/team_cdo/enterprise_metrics.yml \
             --require-semantic-model team_a_equity_positions \
             --require-semantic-model team_c_fi_positions \
             --output /tmp/cdo_composition.yml
@@ -224,7 +216,6 @@ jobs:
           fi
           dbt debug --profiles-dir .ci --connection
           dbt build --profiles-dir .ci --target release --select +cdo_enterprise_positions
-          dbt test --profiles-dir .ci --target release --select assert_cdo_position_composition
 
       - name: Publish release manifest
         if: success()

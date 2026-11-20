@@ -99,9 +99,9 @@ def generate(catalog_path, output_directory):
         columns.append({"name": name, "data_type": dtype[name],
                         "description": "Team-owned extension; NULL when not applicable to the source team."})
 
+    # CDO exposes the governed profit_loss attribute without creating an
+    # additional CDO P&L aggregation. Team A/C inherited P&L metrics remain.
     metrics = [
-        {"name": "cdo_position_profit_loss", "label": "CDO Position Profit and Loss",
-         "type": "simple", "agg": "sum", "expr": "profit_loss"},
         {"name": "cdo_position_row_count", "label": "CDO Position Row Count",
          "description": "Number of position rows across team/date; not necessarily distinct enterprise positions.",
          "type": "simple", "agg": "count", "expr": "position_id"},
@@ -155,7 +155,7 @@ def generate(catalog_path, output_directory):
         "metrics": metrics
     }]}
     # Native YAML deliberately avoids copying local metric names: those still belong
-    # to their original semantic models. Enterprise derived metric remains separately defined.
+    # to their original semantic models.
     out = Path(output_directory)
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{MODEL_NAME}.sql").write_text(sql, encoding="utf-8")
