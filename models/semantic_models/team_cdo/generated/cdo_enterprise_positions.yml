@@ -13,7 +13,7 @@ models:
   semantic_model:
     enabled: true
     name: cdo_enterprise_positions
-  primary_entity: enterprise_position
+  primary_entity: cdo_position
   agg_time_dimension: report_date
   columns:
   - name: source_team
@@ -48,6 +48,11 @@ models:
     data_type: numeric
     description: Team-owned extension; NULL when not applicable to the source team.
   metrics:
+  - name: cdo_total_profit_loss
+    label: CDO Total Profit Loss
+    type: simple
+    agg: sum
+    expr: profit_loss
   - name: cdo_position_row_count
     label: CDO Position Row Count
     description: Number of position rows across team/date; not necessarily distinct enterprise positions.

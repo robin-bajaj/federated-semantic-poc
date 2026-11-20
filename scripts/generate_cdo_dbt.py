@@ -99,9 +99,11 @@ def generate(catalog_path, output_directory):
         columns.append({"name": name, "data_type": dtype[name],
                         "description": "Team-owned extension; NULL when not applicable to the source team."})
 
-    # CDO exposes the governed profit_loss attribute without creating an
-    # additional CDO P&L aggregation. Team A/C inherited P&L metrics remain.
+    # Aggregate governed Position P&L across Team A and Team C in the
+    # CDO unified view. The separate enterprise derived metric stays retired.
     metrics = [
+        {"name": "cdo_total_profit_loss", "label": "CDO Total Profit Loss",
+         "type": "simple", "agg": "sum", "expr": "profit_loss"},
         {"name": "cdo_position_row_count", "label": "CDO Position Row Count",
          "description": "Number of position rows across team/date; not necessarily distinct enterprise positions.",
          "type": "simple", "agg": "count", "expr": "position_id"},
@@ -149,7 +151,7 @@ def generate(catalog_path, output_directory):
         "config": {"meta": {"cdo_contract": "cdo.position", "cdo_contract_version": 1,
                             "composition_sources": [s for _, s, _ in source_maps]}},
         "semantic_model": {"enabled": True, "name": "cdo_enterprise_positions"},
-        "primary_entity": "enterprise_position",
+        "primary_entity": "cdo_position",
         "agg_time_dimension": "report_date",
         "columns": columns,
         "metrics": metrics
