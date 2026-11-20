@@ -48,11 +48,6 @@ models:
     data_type: numeric
     description: Team-owned extension; NULL when not applicable to the source team.
   metrics:
-  - name: cdo_position_profit_loss
-    label: CDO Position Profit and Loss
-    type: simple
-    agg: sum
-    expr: profit_loss
   - name: cdo_position_row_count
     label: CDO Position Row Count
     description: Number of position rows across team/date; not necessarily distinct enterprise positions.
