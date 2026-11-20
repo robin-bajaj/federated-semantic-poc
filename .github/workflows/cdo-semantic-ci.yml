@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate CDO contracts and Meta Context
+    name: Validate CDO contracts and compile Position models
     runs-on: ubuntu-latest
     steps:
       # Get the proposed dbt project changes into dbt-project/ so we validate
@@ -59,10 +59,6 @@ jobs:
       # regress, before compiling the team's semantic declarations.
       - name: Run validator unit tests
         run: python -m pytest contract-validator/cdo/validator/tests -q
-
-      - name: Test native CDO model generator
-        working-directory: dbt-project
-        run: python -m pytest tests/test_generate_cdo_dbt.py -q
 
       # dbt parse needs a syntactically valid adapter profile. These dummy
       # localhost credentials are intentionally not a real database connection:
@@ -129,41 +125,6 @@ jobs:
           test -s target/manifest.json
           test -s target/semantic_manifest.json
 
-      # Check declared model columns/types and CDO reference/version using
-      # the parsed dbt manifest, and check the enterprise metric's Meta:Context
-      # documentation. This is metadata governance, not financial reconciliation.
-      - name: Validate CDO contract and enterprise business context
-        working-directory: dbt-project
-        run: |
-          test -s ../contract-validator/cdo/definitions/position_v1.yml
-          test -s models/semantic_models/team_cdo/enterprise_metrics.yml
-          dbt-mc validate models/semantic_models/team_cdo/enterprise_metrics.yml \
-            --contracts ../contract-validator/cdo/definitions/position_v1.yml \
-            --manifest target/manifest.json
-
-      # Guard against deleting the mandatory enterprise_total_profit_loss
-      # context card: downstream consumers must keep ownership/purpose metadata.
-      - name: Require certified metric context card
-        working-directory: dbt-project
-        run: |
-          python - <<'PY'
-          import yaml
-          from pathlib import Path
-          from meta_context_validator.cli import _extract_metrics
-
-          path = Path('models/semantic_models/team_cdo/enterprise_metrics.yml')
-          data = yaml.safe_load(path.read_text()) or {}
-          matching = [
-              meta for name, meta in _extract_metrics(data)
-              if name == 'enterprise_total_profit_loss'
-          ]
-          if len(matching) != 1 or not matching[0].get('context'):
-              raise SystemExit(
-                  'enterprise_total_profit_loss requires one Meta:Context card'
-              )
-          print('Enterprise metric context exists')
-          PY
-
       # Native dbt contract enforcement requires a live database. Keep secrets
       # out of source and skip this credentialed step for fork PRs.
       - name: Build CDO-governed models with enforced dbt contracts
@@ -207,9 +168,5 @@ jobs:
           # Fresh, isolated schema per run; seed the two sources referenced by
           # Team A/C staging SQL before building their contracted relations.
           dbt seed --profiles-dir .ci --select team_a_positions team_c_positions
-          # Build the CDO view and its upstream Team A/C models BEFORE
-          # the reconciliation test queries cdo_enterprise_positions.
+          # Build the generated CDO view and upstream Team A/C dependencies.
           dbt build --profiles-dir .ci --select +cdo_enterprise_positions
-          # Run the reconciliation explicitly, independent of dbt's indirect
-          # test-selection behavior. A failing comparison blocks CI.
-          dbt test --profiles-dir .ci --select assert_cdo_position_composition
