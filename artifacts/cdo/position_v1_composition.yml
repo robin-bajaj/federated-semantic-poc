@@ -1,0 +1,135 @@
+catalog_format: cdo-federated-semantic-catalog/v1
+name: cdo_enterprise_positions
+contract:
+  name: cdo.position
+  version: 1
+owner: CDO
+description: Composed semantic catalog; execution/routing must be implemented separately.
+common_attributes:
+- position_id
+- report_date
+- profit_loss
+- instrument_code
+implementations:
+- source_model: stg_team_a_positions
+  semantic_model: team_a_equity_positions
+  owner: lob_team_a
+  source_definition: models/semantic_models/team_a/team_a_semantics.yml
+  entity_aliases:
+    position: team_a_position
+  agg_time_dimension: report_date
+  columns:
+  - name: position_id
+    data_type: text
+    description: Enterprise position identifier
+    entity:
+      name: team_a_position
+      type: primary
+  - name: report_date
+    data_type: date
+    granularity: day
+    dimension:
+      type: time
+  - name: profit_loss
+    data_type: numeric
+    description: Standardized position profit and loss
+  - name: instrument_code
+    data_type: integer
+    entity:
+      name: instrument
+      type: foreign
+  - name: mtm
+    data_type: numeric
+  - name: cash
+    data_type: numeric
+  metrics:
+  - type: simple
+    agg: sum
+    expr: profit_loss
+    fill_nulls_with: 0
+    name: equity_profit_loss
+    label: Equity Profit and Loss
+    description: 'Total position profit and loss measured as the sum of standardized position-level profit_loss
+      values over the query''s dimensions and date.
+
+      '
+    config:
+      meta:
+        metric_contract:
+          implements: cdo.profit_loss
+          version: 1
+  - name: team_a_position_count
+    label: Team A Position Count
+    description: Number of Team A Equity Positions.
+    type: simple
+    agg: count
+    expr: position_id
+  - name: equity_total_mtm
+    label: Equity Total Mark to Market
+    description: POC total MTM of Team A positions at the requested reporting grain.
+    type: simple
+    agg: sum
+    expr: mtm
+  - name: equity_total_cash
+    label: Equity Total Cash
+    description: POC total Cash of Team A positions at the requested reporting grain.
+    type: simple
+    agg: sum
+    expr: cash
+- source_model: stg_team_c_positions
+  semantic_model: team_c_fi_positions
+  owner: lob_team_c
+  source_definition: models/semantic_models/team_c/team_c_semantics.yml
+  entity_aliases:
+    position: team_c_position
+  agg_time_dimension: report_date
+  columns:
+  - name: position_id
+    data_type: text
+    description: Enterprise position identifier
+    entity:
+      name: team_c_position
+      type: primary
+  - name: report_date
+    data_type: date
+    granularity: day
+    dimension:
+      type: time
+  - name: profit_loss
+    data_type: numeric
+    description: Standardized position profit and loss
+  - name: instrument_code
+    data_type: integer
+    entity:
+      name: instrument
+      type: foreign
+  - name: settled_cash
+    data_type: numeric
+  metrics:
+  - type: simple
+    agg: sum
+    expr: profit_loss
+    fill_nulls_with: 0
+    name: fixed_income_profit_loss
+    label: Fixed Income Profit and Loss
+    description: 'Total position profit and loss measured as the sum of standardized position-level profit_loss
+      values over the query''s dimensions and date.
+
+      '
+    config:
+      meta:
+        metric_contract:
+          implements: cdo.profit_loss
+          version: 1
+  - name: team_c_position_count
+    label: Team C Position Count
+    description: Number of Team C Fixed Income Positions.
+    type: simple
+    agg: count
+    expr: position_id
+  - name: fi_total_settled_cash
+    label: Fixed Income Total Settled Cash
+    description: POC total settled cash of Team C positions at the requested reporting grain.
+    type: simple
+    agg: sum
+    expr: settled_cash
