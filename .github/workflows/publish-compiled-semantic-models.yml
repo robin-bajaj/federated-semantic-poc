@@ -139,6 +139,14 @@ jobs:
           test -s target/manifest.json
           test -s target/semantic_manifest.json
 
+      - name: Upload composed Team A/C catalog for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdo-position-composition-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/current_cdo_catalog.yml
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Configure protected Neon PostgreSQL release profile
         working-directory: dbt-project
         env:
