@@ -16,12 +16,16 @@ The teams' `config.meta.semantic_inheritance.extends: cdo.position` declaration 
 
 - **`main`:** Independently authored Team A/C SQL and short inheritance YAML. The complete `models/semantic_models/team_cdo/` directory is intentionally absent from authored `main`. CDO definition and generator are in the governance repository.
 - **`generated/production`:** Full native dbt project following manual promotion, with compiled Team A/C semantic YAML and current composite CDO SQL/YAML. Only this branch is the deployment source for the hosted dbt job.
-- **CDO governance:** `cdo/definitions/position_v1.yml` is the source of truth. `meta_context_validator.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
+- **CDO governance:** `contracts/position_v1.yml` is the source of truth. `cdo_governance.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
 
-**Governance revision:** `4d3d38789e9790a0d0b94d3bccdb8008877d0fe1` is pinned in CI and promotion. Update both together after reviewing governance updates.
+**Governance revision:** `ebbfec8868c088750e43089977b7862580be3d40` is pinned in CI and promotion. Update both together after reviewing governance updates.
 
 **Promotion caveat:** An existing branch's manual merge into `generated/production` precedes compilation and validation, so the branch temporarily contains the freshly merged authored YAML until GitHub Actions finishes. Do not configure a hosted dbt Cloud deployment to run automatically on *every* branch push: manually invoke it **after** the promotion succeeds to avoid parsing transient custom inheritance metadata. If the promotion fails, the deployment branch is not ready and should not be deployed.
 
 **First-time creation:** GitHub cannot trigger a branch-specific `push` workflow on a branch that does not exist. The additional `workflow_dispatch` trigger on `main` generates and validates the native output, builds Neon and then creates `generated/production` if absent. For later updates, merge approved `main` into that branch; pushes trigger regeneration. Bot-generated commits do not recursively trigger this workflow.
 
 **Inspectable CDO composition:** Each successful promotion copies the validated Team A/C catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`. It includes participants, standardized CDO attributes, aliases, team-specific extensions, and inherited/team metrics. This custom metadata is **not a native dbt semantic model** and must remain outside `models/`. The native dbt artifacts remain `models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql` and `.yml`.
+
+## Governance package upgrade
+
+The [CDO governance toolkit](https://github.com/robin-bajaj/cdo-semantic-governance) is now a root-level Python project with `contracts/position_v1.yml`, `src/cdo_governance/semantic/`, `src/cdo_governance/validation/`, `tests/`, and `pyproject.toml`. Federated pipelines install the pinned checkout using `pip install ./contract-validator` and run `python -m cdo_governance.semantic.inheritance`, `...composition`, and `...dbt_generator` as appropriate.
