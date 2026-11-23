@@ -32,8 +32,7 @@ concurrency:
 
 jobs:
   sync:
-    name: Generate and propose CDO Position snapshot
-    if: github.event_name != 'workflow_call' || inputs.mode == 'preview'
+    name: Generate CDO Position snapshot (preview or publish)
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -43,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_ref || 'main' }}
-          persist-credentials: ${{ github.event_name != 'workflow_call' }}
+          persist-credentials: ${{ inputs.mode != 'preview' }}
 
       - name: Install compiler, dbt, and parser dependencies
         run: |
@@ -99,7 +98,7 @@ jobs:
       # PR preview is read-only. These artifacts are candidates; no branch,
       # snapshot PR, release schema, or production deployment is modified.
       - name: Upload proposed CDO Position SQL and YAML
-        if: github.event_name == 'workflow_call' && inputs.mode == 'preview'
+        if: inputs.mode == 'preview'
         uses: actions/upload-artifact@v4
         with:
           name: cdo-position-preview-${{ github.run_id }}-${{ github.run_attempt }}
@@ -110,7 +109,7 @@ jobs:
           retention-days: 14
 
       - name: Compare snapshot and create or update CDO review PR
-        if: github.event_name != 'workflow_call'
+        if: inputs.mode != 'preview'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
