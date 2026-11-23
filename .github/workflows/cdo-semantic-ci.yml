@@ -179,7 +179,7 @@ jobs:
     # Caller permissions cap all reusable jobs to read-only.
     permissions:
       contents: read
-    uses: ./.github/workflows/sync-cdo-position-snapshot.yml
+    uses: ./.github/workflows/generate-cdo-position-snapshot.yml
     with:
-      mode: preview
       source_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      source_repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
