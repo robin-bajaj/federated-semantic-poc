@@ -1,10 +1,12 @@
-# Manually promote approved main to a dbt-native deployment branch.
-# One run owns composition, native CDO generation, validation, Neon build and Git publish.
+# Triggered when maintainers manually merge approved main into generated/production.
+# One run owns compilation, composition, native CDO generation, Neon build and Git publish.
 # The hosted dbt Cloud job remains a separate action and is NOT invoked here.
 name: Promote CDO Semantic Models to Production
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - generated/production
 
 permissions:
   contents: write
@@ -18,15 +20,25 @@ jobs:
     name: Generate, validate, build and promote CDO Position
     # Preserve the existing protected database-release approval gate.
     environment: cdo-release
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/generated/production'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout approved main source
+      - name: Checkout manually merged generated/production branch
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           path: dbt-project
           fetch-depth: 0
+
+      - name: Verify this promotion includes current approved main
+        working-directory: dbt-project
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge-base --is-ancestor origin/main HEAD || {
+            echo "::error::generated/production must include the current main commit. Manually merge main before promoting."
+            exit 1
+          }
 
       - name: Checkout approved CDO governance compiler, composer and generator
         uses: actions/checkout@v4
@@ -149,13 +161,13 @@ jobs:
           dbt debug --profiles-dir .ci --target release --connection
           dbt build --profiles-dir .ci --target release --select +cdo_enterprise_positions
 
-      - name: Publish complete compiled source to generated/production
+      - name: Commit compiled Team A/C and generated CDO snapshot to deployment branch
         working-directory: dbt-project
         shell: bash
         run: |
           set -euo pipefail
-          # The branch is regenerated from main on every manual promotion.
-          # Only compiled Team A/C YAML and generated CDO SQL/YAML are committed.
+          # This job is the only writer of generated semantics after a
+          # human has merged main into generated/production.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- \
@@ -163,18 +175,13 @@ jobs:
             models/semantic_models/team_c/team_c_semantics.yml \
             models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql \
             models/semantic_models/team_cdo/generated/cdo_enterprise_positions.yml
-          # An empty commit still advances the deployment branch to the approved
-          # main revision if only non-generated dbt project files changed.
-          source_commit="$(git rev-parse HEAD)"
-          git commit --allow-empty -m "build(cdo): manually promote approved main ${source_commit}"
-          git fetch origin '+refs/heads/generated/production:refs/remotes/origin/generated/production' || true
-          if git rev-parse --verify -q refs/remotes/origin/generated/production >/dev/null; then
-            expected="$(git rev-parse refs/remotes/origin/generated/production)"
-          else
-            expected=""
+          if git diff --cached --quiet; then
+            echo "Native dbt project already matches the manually merged branch."
+            exit 0
           fi
-          git push --force-with-lease="refs/heads/generated/production:${expected}" \
-            origin HEAD:refs/heads/generated/production
+          git commit -m "build(cdo): compile and compose approved Position semantics"
+          # Never overwrite concurrent changes, or force-push this promotion branch.
+          git push origin HEAD:refs/heads/generated/production
 
       - name: Upload successful build and semantic manifests
         uses: actions/upload-artifact@v4
@@ -188,5 +195,5 @@ jobs:
 
       - name: Handoff to hosted dbt Cloud deployment
         run: |
-          echo "Native dbt project promoted to generated/production."
+          echo "Native dbt project validated and generated on generated/production after manual merge."
           echo "Run the dbt Cloud job tracking generated/production to refresh the hosted Semantic Layer."
