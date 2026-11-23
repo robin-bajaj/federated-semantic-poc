@@ -18,7 +18,7 @@ The teams' `config.meta.semantic_inheritance.extends: cdo.position` declaration 
 - **`generated/production`:** Full native dbt project following manual promotion, with compiled Team A/C semantic YAML and current composite CDO SQL/YAML. Only this branch is the deployment source for the hosted dbt job.
 - **CDO governance:** `cdo/definitions/position_v1.yml` is the source of truth. `meta_context_validator.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
 
-**Governance revision:** `5bb68b62ee99c7d8aa220ee0ae50507f5b1b0903` is pinned in CI and promotion. Update both together after reviewing governance updates.
+**Governance revision:** `4d3d38789e9790a0d0b94d3bccdb8008877d0fe1` is pinned in CI and promotion. Update both together after reviewing governance updates.
 
 **Promotion caveat:** An existing branch's manual merge into `generated/production` precedes compilation and validation, so the branch temporarily contains the freshly merged authored YAML until GitHub Actions finishes. Do not configure a hosted dbt Cloud deployment to run automatically on *every* branch push: manually invoke it **after** the promotion succeeds to avoid parsing transient custom inheritance metadata. If the promotion fails, the deployment branch is not ready and should not be deployed.
 
