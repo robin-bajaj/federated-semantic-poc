@@ -23,20 +23,29 @@ jobs:
     if: github.ref == 'refs/heads/generated/production'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout manually merged generated/production branch
+      - name: Checkout clean approved main source for deterministic compilation
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: dbt-project
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout manually merged deployment branch for publication
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          path: dbt-project
+          path: deployment-project
           fetch-depth: 0
 
-      - name: Verify this promotion includes current approved main
-        working-directory: dbt-project
+      - name: Verify manual merge includes latest approved main
+        working-directory: deployment-project
+        shell: bash
         run: |
           set -euo pipefail
           git fetch origin main
           git merge-base --is-ancestor origin/main HEAD || {
-            echo "::error::generated/production must include the current main commit. Manually merge main before promoting."
+            echo "::error::Merge current main into generated/production before promotion."
             exit 1
           }
 
@@ -161,13 +170,20 @@ jobs:
           dbt debug --profiles-dir .ci --target release --connection
           dbt build --profiles-dir .ci --target release --select +cdo_enterprise_positions
 
-      - name: Commit compiled Team A/C and generated CDO snapshot to deployment branch
-        working-directory: dbt-project
+      - name: Commit generated native dbt files to manually merged deployment branch
+        working-directory: deployment-project
         shell: bash
         run: |
           set -euo pipefail
-          # This job is the only writer of generated semantics after a
-          # human has merged main into generated/production.
+          source_dir="../dbt-project/models/semantic_models"
+          target_dir="models/semantic_models"
+          # Never attempt to compile already-expanded models from a previous
+          # generated/production run. Always copy freshly compiled main output.
+          cp "$source_dir/team_a/team_a_semantics.yml" "$target_dir/team_a/team_a_semantics.yml"
+          cp "$source_dir/team_c/team_c_semantics.yml" "$target_dir/team_c/team_c_semantics.yml"
+          mkdir -p "$target_dir/team_cdo/generated"
+          cp "$source_dir/team_cdo/generated/cdo_enterprise_positions.sql" "$target_dir/team_cdo/generated/cdo_enterprise_positions.sql"
+          cp "$source_dir/team_cdo/generated/cdo_enterprise_positions.yml" "$target_dir/team_cdo/generated/cdo_enterprise_positions.yml"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- \
@@ -176,11 +192,11 @@ jobs:
             models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql \
             models/semantic_models/team_cdo/generated/cdo_enterprise_positions.yml
           if git diff --cached --quiet; then
-            echo "Native dbt project already matches the manually merged branch."
+            echo "Native models already match the compiled approved main source."
             exit 0
           fi
           git commit -m "build(cdo): compile and compose approved Position semantics"
-          # Never overwrite concurrent changes, or force-push this promotion branch.
+          # Never force push or overwrite a concurrent update.
           git push origin HEAD:refs/heads/generated/production
 
       - name: Upload successful build and semantic manifests
