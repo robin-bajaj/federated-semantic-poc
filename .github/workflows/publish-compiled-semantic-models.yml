@@ -73,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: robin-bajaj/cdo-semantic-governance
-          ref: 4d3d38789e9790a0d0b94d3bccdb8008877d0fe1
+          ref: ebbfec8868c088750e43089977b7862580be3d40
           path: contract-validator
           persist-credentials: false
 
@@ -85,16 +85,16 @@ jobs:
       - name: Install dbt and CDO governance package
         run: |
           python -m pip install --upgrade pip
-          python -m pip install 'dbt-core==1.12.6' 'dbt-postgres==1.11.0' pytest ./contract-validator/cdo/validator
+          python -m pip install 'dbt-core==1.12.6' 'dbt-postgres==1.11.0' pytest ./contract-validator
 
       - name: Run CDO governance regression tests
-        run: python -m pytest contract-validator/cdo/validator/tests -q
+        run: python -m pytest contract-validator/tests -q
 
       - name: Compile team inheritance and parse native dbt project
         working-directory: dbt-project
         run: |
-          python -m meta_context_validator.semantic.inheritance \
-            --registry ../contract-validator/cdo/definitions/position_v1.yml \
+          python -m cdo_governance.semantic.inheritance \
+            --registry ../contract-validator/contracts/position_v1.yml \
             --project .
           mkdir -p .ci
           cat > .ci/profiles.yml <<'PROFILE'
@@ -119,9 +119,9 @@ jobs:
       - name: Compose both teams into temporary CDO catalog
         working-directory: dbt-project
         run: |
-          python -m meta_context_validator.semantic.composition \
+          python -m cdo_governance.semantic.composition \
             --project . \
-            --contract ../contract-validator/cdo/definitions/position_v1.yml \
+            --contract ../contract-validator/contracts/position_v1.yml \
             --manifest target/manifest.json \
             --require-semantic-model team_a_equity_positions \
             --require-semantic-model team_c_fi_positions \
@@ -130,7 +130,7 @@ jobs:
       - name: Generate native CDO SQL/YAML and validate semantic manifest
         working-directory: dbt-project
         run: |
-          python -m meta_context_validator.semantic.dbt_generator \
+          python -m cdo_governance.semantic.dbt_generator \
             --catalog /tmp/current_cdo_catalog.yml \
             --out models/semantic_models/team_cdo/generated
           test -s models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql
