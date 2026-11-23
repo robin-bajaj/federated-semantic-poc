@@ -1,5 +1,5 @@
 # Pull-request quality gate for CDO-governed semantic models.
-# It does NOT update GitHub's production branch or deploy to dbt Cloud/Power BI.
+# Validation only: Team A/C PRs cannot generate CDO snapshots or publish branches.
 name: CDO Semantic Contract CI
 
 # Run when changes are proposed to main, or when a maintainer starts it manually.
@@ -168,21 +168,6 @@ jobs:
           # Fresh, isolated schema per run; seed the two sources referenced by
           # Team A/C staging SQL before building their contracted relations.
           dbt seed --profiles-dir .ci --select team_a_positions team_c_positions
-          # Validate only the participating physical contracts; the reusable
-          # Sync preview validates proposed CDO generation separately.
+          # Validate only participating Team A/C physical contracts.
+          # No CDO composition, snapshot or deployment occurs in this workflow.
           dbt build --profiles-dir .ci --select stg_team_a_positions stg_team_c_positions
-
-  preview-cdo-snapshot:
-    name: Generate isolated CDO Position PR snapshot
-    needs: validate
-    # Reusable workflow checks out the PR's exact head SHA, not main.
-    # Caller permissions cap all reusable jobs to read-only.
-    permissions:
-      contents: write
-      pull-requests: write
-    uses: ./.github/workflows/sync-cdo-position-snapshot.yml
-    with:
-      mode: candidate
-      source_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      source_repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
-      pr_number: ${{ github.event.pull_request.number || 0 }}
