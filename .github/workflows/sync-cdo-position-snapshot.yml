@@ -12,33 +12,44 @@ on:
       - 'models/semantic_models/team_c/**'
       - 'scripts/generate_cdo_dbt.py'
       - '.github/workflows/sync-cdo-position-snapshot.yml'
+  workflow_call:
+    inputs:
+      mode:
+        description: Preview generation without writing to GitHub
+        required: true
+        type: string
+      source_ref:
+        description: Exact pull request commit SHA to preview
+        required: true
+        type: string
   workflow_dispatch:
   schedule:
     - cron: '15 12 * * 1-5'
 
-permissions:
-  contents: write
-  pull-requests: write
-
 concurrency:
-  group: sync-cdo-position-snapshot
+  group: sync-cdo-position-snapshot-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   sync:
     name: Generate and propose CDO Position snapshot
+    if: github.event_name != 'workflow_call' || inputs.mode == 'preview'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
-      - name: Checkout approved source on main
+      - name: Checkout PR candidate or approved main
         uses: actions/checkout@v4
         with:
-          ref: main
-          persist-credentials: true
+          ref: ${{ inputs.source_ref || 'main' }}
+          persist-credentials: ${{ github.event_name != 'workflow_call' }}
 
       - name: Install compiler, dbt, and parser dependencies
         run: |
           python -m pip install 'PyYAML>=6.0' 'dbt-core==1.12.6' 'dbt-postgres==1.11.0'
-          git clone --depth 1 https://github.com/robin-bajaj/cdo-semantic-governance.git /tmp/cdo-validator
+          git clone https://github.com/robin-bajaj/cdo-semantic-governance.git /tmp/cdo-validator
+          git -C /tmp/cdo-validator checkout --detach d04d9f73eb3e239b1007245f840cfbdc56dadc02
           python -m pip install /tmp/cdo-validator/cdo/validator
 
       - name: Configure parse-only profile
@@ -85,7 +96,21 @@ jobs:
           test -s target/manifest.json
           test -s target/semantic_manifest.json
 
+      # PR preview is read-only. These artifacts are candidates; no branch,
+      # snapshot PR, release schema, or production deployment is modified.
+      - name: Upload proposed CDO Position SQL and YAML
+        if: github.event_name == 'workflow_call' && inputs.mode == 'preview'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdo-position-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql
+            models/semantic_models/team_cdo/generated/cdo_enterprise_positions.yml
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Compare snapshot and create or update CDO review PR
+        if: github.event_name != 'workflow_call'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
