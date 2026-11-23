@@ -1,83 +1,81 @@
-# Release-only workflow: turn Team A/C's short CDO inheritance declarations
-# into native dbt YAML in an automatically maintained deployment branch.
-# This does not update the hosted dbt Semantic Layer or Power BI by itself.
-name: Publish Compiled CDO Semantic Models (Manual)
+# Triggered when maintainers manually merge approved main into generated/production.
+# One run owns compilation, composition, native CDO generation, Neon build and Git publish.
+# The hosted dbt Cloud job remains a separate action and is NOT invoked here.
+name: Promote CDO Semantic Models to Production
 
-# This workflow prepares a native dbt deployment branch. It DOES NOT trigger
-# a dbt Cloud deployment or activate the production Semantic Layer by itself.
-# Manual trigger: merging into main will NOT create generated/production.
-# Run from Actions > Publish Compiled CDO Semantic Models > Run workflow.
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - generated/production
 
-# This Team-controlled workflow must push the generated branch to this repo.
-# The separate CDO checkout is read-only; CDO never writes Team A/C Git files.
 permissions:
   contents: write
 
-# Do not publish two releases simultaneously, which could race on the branch.
 concurrency:
-  group: publish-compiled-semantic-models
+  group: promote-cdo-generated-production
   cancel-in-progress: false
 
 jobs:
-  compile-and-publish:
+  promote:
+    name: Generate, validate, build and promote CDO Position
+    # Preserve the existing protected database-release approval gate.
+    environment: cdo-release
+    if: github.ref == 'refs/heads/generated/production'
     runs-on: ubuntu-latest
     steps:
-      # Fetch main (our single, developer-maintained source of truth).
-      # Keep Git history so the generated branch can be based on main.
-      - name: Checkout authoritative Team A/C dbt source
+      - name: Checkout clean approved main source for deterministic compilation
         uses: actions/checkout@v4
         with:
           ref: main
           path: dbt-project
           fetch-depth: 0
+          persist-credentials: false
 
-      # Fetch CDO's approved Position contract and the inheritance compiler.
-      # A pinned commit keeps every release reproducible until teams opt into
-      # an updated CDO version; persist-credentials:false avoids CDO Git writes.
-      - name: Checkout pinned CDO definition and compiler (read-only)
+      - name: Checkout manually merged deployment branch for publication
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: deployment-project
+          fetch-depth: 0
+
+      - name: Verify manual merge includes latest approved main
+        working-directory: deployment-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git merge-base --is-ancestor origin/main HEAD || {
+            echo "::error::Merge current main into generated/production before promotion."
+            exit 1
+          }
+
+      - name: Checkout approved CDO governance compiler, composer and generator
         uses: actions/checkout@v4
         with:
           repository: robin-bajaj/cdo-semantic-governance
-          ref: df929f7bd36fd98882b575903428e5815b82d093
+          ref: dbcddc0cf58d05d393f95943ae954577c2e0957b
           path: contract-validator
           persist-credentials: false
 
-      # The custom compiler and its tests run in Python; dbt also uses Python.
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # Pin dbt/parser versions and install the custom CDO compiler package.
-      # This does not install or configure a production warehouse connection.
-      - name: Install dbt and the CDO validator
+      - name: Install dbt and CDO governance package
         run: |
           python -m pip install --upgrade pip
           python -m pip install 'dbt-core==1.12.6' 'dbt-postgres==1.11.0' pytest ./contract-validator/cdo/validator
 
-      # Fail the release before publishing if the central compiler regresses.
-      - name: Run compiler unit tests
+      - name: Run CDO governance regression tests
         run: python -m pytest contract-validator/cdo/validator/tests -q
 
-      # Expand extends:cdo.position for both teams inside a disposable checkout.
-      # Inherit CDO columns/entities/dimensions + SUM(profit_loss), while keeping
-      # team-specific aliases and fields. main remains reference-only in Git.
-      - name: Compile the complete semantic model in this release workspace
+      - name: Compile team inheritance and parse native dbt project
         working-directory: dbt-project
         run: |
           python -m meta_context_validator.compile_semantics \
             --registry ../contract-validator/cdo/definitions/position_v1.yml \
             --project .
-
-      # Check that dbt parses the expanded YAML and produces a semantic manifest.
-      # Dummy localhost Postgres details are sufficient for parse-only checks;
-      # NO warehouse tables are built and no metric values are queried here.
-      # Meta:Context and CDO column/type contract checks must also pass.
-      - name: Validate expanded native dbt project
-        working-directory: dbt-project
-        run: |
           mkdir -p .ci
           cat > .ci/profiles.yml <<'PROFILE'
           default:
@@ -97,50 +95,121 @@ jobs:
             dbt deps --profiles-dir .ci
           fi
           dbt parse --profiles-dir .ci --no-partial-parse
+
+      - name: Compose both teams into temporary CDO catalog
+        working-directory: dbt-project
+        run: |
+          python -m meta_context_validator.compose_cdo \
+            --project . \
+            --contract ../contract-validator/cdo/definitions/position_v1.yml \
+            --manifest target/manifest.json \
+            --require-semantic-model team_a_equity_positions \
+            --require-semantic-model team_c_fi_positions \
+            --output /tmp/current_cdo_catalog.yml
+
+      - name: Generate native CDO SQL/YAML and validate semantic manifest
+        working-directory: dbt-project
+        run: |
+          python -m meta_context_validator.generate_cdo_dbt \
+            --catalog /tmp/current_cdo_catalog.yml \
+            --out models/semantic_models/team_cdo/generated
+          test -s models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql
+          test -s models/semantic_models/team_cdo/generated/cdo_enterprise_positions.yml
+          dbt parse --profiles-dir .ci --no-partial-parse
+          test -s target/manifest.json
           test -s target/semantic_manifest.json
 
-      # ONLY after validation: commit expanded Team A/C YAML to a generated
-      # branch. Other project files come from the same checked-out main commit.
-      # This creates generated/production on the first successful run and
-      # updates it on later runs; it never commits generated YAML to main.
-      - name: Publish generated project on Team A-controlled deployment branch
+      - name: Configure protected Neon PostgreSQL release profile
         working-directory: dbt-project
         env:
-          SOURCE_COMMIT: ${{ github.sha }}
+          DBT_PG_HOST: ${{ secrets.DBT_PG_HOST }}
+          DBT_PG_PORT: ${{ secrets.DBT_PG_PORT }}
+          DBT_PG_USER: ${{ secrets.DBT_PG_USER }}
+          DBT_PG_PASSWORD: ${{ secrets.DBT_PG_PASSWORD }}
+          DBT_PG_DBNAME: ${{ secrets.DBT_PG_DBNAME }}
+          DBT_CDO_RELEASE_SCHEMA: ${{ vars.DBT_CDO_RELEASE_SCHEMA }}
+        shell: bash
         run: |
           set -euo pipefail
-          # Identify the automation rather than pretending a developer authored
-          # the expanded files.
+          for key in DBT_PG_HOST DBT_PG_USER DBT_PG_PASSWORD DBT_PG_DBNAME DBT_CDO_RELEASE_SCHEMA; do
+            if [ -z "${!key:-}" ]; then
+              echo "::error::Missing required secret/variable: $key"
+              exit 1
+            fi
+          done
+          if ! [[ "$DBT_CDO_RELEASE_SCHEMA" =~ ^[a-z][a-z0-9_]*$ ]]; then
+            echo "::error::Invalid DBT_CDO_RELEASE_SCHEMA"
+            exit 1
+          fi
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: release
+            outputs:
+              release:
+                type: postgres
+                host: "{{ env_var('DBT_PG_HOST') }}"
+                port: "{{ env_var('DBT_PG_PORT', '5432') | int }}"
+                user: "{{ env_var('DBT_PG_USER') }}"
+                password: "{{ env_var('DBT_PG_PASSWORD') }}"
+                dbname: "{{ env_var('DBT_PG_DBNAME') }}"
+                schema: "{{ env_var('DBT_CDO_RELEASE_SCHEMA') }}"
+                sslmode: require
+                threads: 2
+          PROFILE
+
+      - name: Build Team A/C staging and CDO unified view in Neon
+        working-directory: dbt-project
+        env:
+          DBT_PG_HOST: ${{ secrets.DBT_PG_HOST }}
+          DBT_PG_PORT: ${{ secrets.DBT_PG_PORT }}
+          DBT_PG_USER: ${{ secrets.DBT_PG_USER }}
+          DBT_PG_PASSWORD: ${{ secrets.DBT_PG_PASSWORD }}
+          DBT_PG_DBNAME: ${{ secrets.DBT_PG_DBNAME }}
+          DBT_CDO_RELEASE_SCHEMA: ${{ vars.DBT_CDO_RELEASE_SCHEMA }}
+        run: |
+          dbt debug --profiles-dir .ci --target release --connection
+          dbt build --profiles-dir .ci --target release --select +cdo_enterprise_positions
+
+      - name: Commit generated native dbt files to manually merged deployment branch
+        working-directory: deployment-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="../dbt-project/models/semantic_models"
+          target_dir="models/semantic_models"
+          # Never attempt to compile already-expanded models from a previous
+          # generated/production run. Always copy freshly compiled main output.
+          cp "$source_dir/team_a/team_a_semantics.yml" "$target_dir/team_a/team_a_semantics.yml"
+          cp "$source_dir/team_c/team_c_semantics.yml" "$target_dir/team_c/team_c_semantics.yml"
+          mkdir -p "$target_dir/team_cdo/generated"
+          cp "$source_dir/team_cdo/generated/cdo_enterprise_positions.sql" "$target_dir/team_cdo/generated/cdo_enterprise_positions.sql"
+          cp "$source_dir/team_cdo/generated/cdo_enterprise_positions.yml" "$target_dir/team_cdo/generated/cdo_enterprise_positions.yml"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # No external file or generated manifest is pushed into main.
-          # Commit only the two expanded semantic YAML files; all other
-          # dbt project files are inherited from the checked-out main commit.
-          git add models/semantic_models/team_a/team_a_semantics.yml
-          git add models/semantic_models/team_c/team_c_semantics.yml
-          # Stop if no compilations changed the checked-out semantic YAML.
-          git diff --cached --quiet && { echo "No compiled changes to commit"; exit 1; }
-
-          git commit -m "build: compile CDO Position semantics from main ${SOURCE_COMMIT}"
-          # Determine the current remote branch head, if it already exists.
-          # An empty expected SHA means the first publish must create the branch.
-          git fetch origin '+refs/heads/generated/production:refs/remotes/origin/generated/production' || true
-          if git rev-parse --verify -q refs/remotes/origin/generated/production >/dev/null; then
-            expected="$(git rev-parse refs/remotes/origin/generated/production)"
-          else
-            expected=""
+          git add -- \
+            models/semantic_models/team_a/team_a_semantics.yml \
+            models/semantic_models/team_c/team_c_semantics.yml \
+            models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql \
+            models/semantic_models/team_cdo/generated/cdo_enterprise_positions.yml
+          if git diff --cached --quiet; then
+            echo "Native models already match the compiled approved main source."
+            exit 0
           fi
-          # The generated branch is regenerated from main, never edited by hand.
-          # A lease prevents overwriting an unexpected concurrent branch update.
-          git push --force-with-lease="refs/heads/generated/production:${expected}" \
-            origin HEAD:refs/heads/generated/production
+          git commit -m "build(cdo): compile and compose approved Position semantics"
+          # Never force push or overwrite a concurrent update.
+          git push origin HEAD:refs/heads/generated/production
 
-      # Publishing a Git branch is NOT a dbt Cloud deployment. A separate dbt
-      # Cloud environment must track generated/production and run its own parse
-      # before the hosted Semantic Layer / Power BI can query new definitions.
-      - name: Deployment handoff reminder
+      - name: Upload successful build and semantic manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: promoted-cdo-manifests
+          path: |
+            dbt-project/target/manifest.json
+            dbt-project/target/semantic_manifest.json
+            dbt-project/target/run_results.json
+          if-no-files-found: error
+
+      - name: Handoff to hosted dbt Cloud deployment
         run: |
-          echo "Compiled Git branch: generated/production"
-          echo "Configure a dbt Cloud production environment to checkout this branch."
-          echo "This workflow does NOT publish the hosted Semantic Layer by itself."
+          echo "Native dbt project validated and generated on generated/production after manual merge."
+          echo "Run the dbt Cloud job tracking generated/production to refresh the hosted Semantic Layer."
