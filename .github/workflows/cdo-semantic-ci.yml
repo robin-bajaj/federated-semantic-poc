@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: robin-bajaj/cdo-semantic-governance
-          ref: d897eb58a6ad91b9940dca44690539be4dbc81c7 # Reviewed CDO governance commit
+          ref: ec9b6d48664adbecdcffc2cf8e257b03165beca0 # Reviewed CDO governance commit
           path: contract-validator
           persist-credentials: false
 
@@ -82,7 +82,7 @@ jobs:
                 threads: 1
           PROFILE
 
-      # Resolve Team A/C's custom semantic_inheritance.extends reference.
+      # Resolve Team A/C's custom CDO Position inheritance reference.
       # The compiler reads CDO's Position fields, entities, dimensions, and
       # SUM(profit_loss) formula, merges local additions/aliases, and rewrites
       # the YAML only inside the disposable dbt-project/ checkout.
