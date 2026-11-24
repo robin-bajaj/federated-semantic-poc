@@ -27,15 +27,15 @@ jobs:
           persist-credentials: false
 
       # Fetch the separately owned CDO registry, semantic inheritance compiler,
-      # contract validator, and unit tests into contract-validator/.
+      # contract validator, and unit tests into cdo-governance/.
       # Pinning to a reviewed commit prevents central definition changes from
       # silently changing Team A/C semantics during a pull-request run.
-      - name: Checkout extended Meta Context validator
+      - name: Checkout pinned CDO governance repository
         uses: actions/checkout@v4
         with:
           repository: robin-bajaj/cdo-semantic-governance
-          ref: ebbfec8868c088750e43089977b7862580be3d40 # Reviewed CDO governance commit
-          path: contract-validator
+          ref: 3457ae84cf1a372e0f20c5fb2b43579727ed224b # Reviewed CDO governance commit
+          path: cdo-governance
           persist-credentials: false
 
       # Use a consistent Python version for YAML compilation, tests and dbt.
@@ -46,19 +46,24 @@ jobs:
 
       # Install pinned dbt Core + Postgres adapter, test tooling and the custom
       # CDO package. dbt still executes metrics; Python only resolves metadata.
-      - name: Install dbt and custom validator
+      - name: Install dbt and CDO governance package
         run: |
           python -m pip install --upgrade pip
           python -m pip install \
             'dbt-core==1.12.6' \
             'dbt-postgres==1.11.0' \
             pytest \
-            ./contract-validator
+            ./cdo-governance
 
       # Fail early if CDO's inheritance, collision checks or contract logic
       # regress, before compiling the team's semantic declarations.
-      - name: Run validator unit tests
-        run: python -m pytest contract-validator/tests -q
+      - name: Run CDO governance regression tests
+        run: python -m pytest cdo-governance/tests -q
+
+      # Validate all centrally governed contracts, including counterparty,
+      # before compiling either team's inherited Position semantics.
+      - name: Validate CDO_ALL business registry and concept inheritance
+        run: python -m cdo_governance.semantic.contract_registry --registry cdo-governance/contracts
 
       # dbt parse needs a syntactically valid adapter profile. These dummy
       # localhost credentials are intentionally not a real database connection:
@@ -82,7 +87,7 @@ jobs:
                 threads: 1
           PROFILE
 
-      # Resolve Team A/C's custom semantic_inheritance.extends reference.
+      # Resolve Team A/C's custom CDO Position inheritance reference.
       # The compiler reads CDO's Position fields, entities, dimensions, and
       # SUM(profit_loss) formula, merges local additions/aliases, and rewrites
       # the YAML only inside the disposable dbt-project/ checkout.
@@ -91,7 +96,7 @@ jobs:
       - name: Compile inherited CDO Position semantics
         working-directory: dbt-project
         run: |
-          python -m cdo_governance.semantic.inheritance --registry ../contract-validator/contracts/position_v1.yml --project .
+          python -m cdo_governance.semantic.semantic_compiler --registry ../cdo-governance/contracts --project .
           python - <<'PY'
           import yaml
           from pathlib import Path
