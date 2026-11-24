@@ -16,7 +16,7 @@ Team A and Team C both use `config.meta.uses: cdo.position` with matching struct
 
 - **`main`:** Independently authored Team A/C SQL and short inheritance YAML. The complete `models/semantic_models/team_cdo/` directory is intentionally absent from authored `main`. CDO definition and generator are in the governance repository.
 - **`generated/production`:** Full native dbt project following manual promotion, with compiled Team A/C semantic YAML and current composite CDO SQL/YAML. Only this branch is the deployment source for the hosted dbt job.
-- **CDO governance:** `contracts/cdo_all_v1.yml` is the enterprise business definition source. `contracts/cdo_position_v1.yml` selects Position fields/metric, and `contracts/cdo_counterparty_v1.yml` selects Counterparty fields without duplicating their definitions. `cdo_governance.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
+- **CDO governance:** `contracts/cdo_all_v1.yml` is the enterprise business definition source. `contracts/cdo_position_v1.yml` selects Position fields/metric, and `contracts/cdo_counterparty_v1.yml` selects Counterparty fields without duplicating their definitions. `cdo_governance.semantic.semantic_compiler`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
 
 **Governance revision:** CI and promotion pin the same reviewed CDO governance commit. Update both workflow pins together when the governed contract or compiler changes.
 
@@ -33,7 +33,7 @@ The logical contract names remain `cdo.all`, `cdo.position` and `cdo.counterpart
 
 ## Governance package upgrade
 
-The [CDO governance Python package](https://github.com/robin-bajaj/cdo-semantic-governance) is now a root-level Python project with `contracts/cdo_all_v1.yml`, `contracts/cdo_position_v1.yml`, `contracts/cdo_counterparty_v1.yml`, `src/cdo_governance/semantic/`, `src/cdo_governance/validation/`, `tests/`, and `pyproject.toml`. Federated pipelines install the pinned checkout using `pip install ./cdo-governance` and run `python -m cdo_governance.semantic.inheritance`, `...composition`, and `...dbt_generator` as appropriate.
+The [CDO governance Python package](https://github.com/robin-bajaj/cdo-semantic-governance) is now a root-level Python project with `contracts/cdo_all_v1.yml`, `contracts/cdo_position_v1.yml`, `contracts/cdo_counterparty_v1.yml`, `src/cdo_governance/semantic/`, `src/cdo_governance/validation/`, `tests/`, and `pyproject.toml`. Federated pipelines install the pinned checkout using `pip install ./cdo-governance` and run `python -m cdo_governance.semantic.semantic_compiler`, `...composition`, and `...dbt_generator` as appropriate.
 
 ## Explicit CDO attribute selection
 
@@ -58,3 +58,9 @@ cdo.all v1              Central dictionary: Position + Counterparty fields and P
 Team A/C keep their current `config.meta.uses: cdo.position`, metric aliases, physical SQL, additional attributes and native dbt contracts. The **CDO compiler**, not dbt, resolves the version-pinned parent graph before generating native dbt metadata. Both pipelines run the registry validator and governance tests first. CI only validates teams; production promotion still requires the protected release build and separate dbt Cloud deployment handoff.
 
 Important: The Counterparty contract does **not** automatically create a relational table or a join from Position. A separate counterparty model and explicit semantic relationship will be needed for cross-concept queries. Governed contract versions should remain immutable once published; enforce by review policy and repository protection.
+
+
+## Python module naming
+
+The CDO governance Python package now uses descriptive module names:
+`semantic.contract_registry` (versioned logical contracts), `semantic.semantic_compiler` (team model expansion), `semantic.position_composer` (Position catalog), `semantic.position_dbt_generator` (generated native Position SQL/YAML), and `validation.contract_validator` (model contract validation). The CI and promotion workflows call these current modules. Historical import and `python -m` paths remain supported by thin compatibility wrappers so other consumers can migrate separately.
