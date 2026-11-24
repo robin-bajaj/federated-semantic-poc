@@ -2,7 +2,7 @@
 
 Team A (Equity) and Team C (Fixed Income) independently author their Position models in the federated dbt repository. The [CDO governance repository](https://github.com/robin-bajaj/cdo-semantic-governance) owns the enterprise `cdo.position` v1 contract, semantic inheritance compiler, validation, composer, and generator for native dbt CDO SQL/YAML.
 
-Team A and Team C both use `config.meta.cdo.uses: cdo.position` with matching structured `include.attributes` and `include.metrics` sections. This is **custom** inheritance metadata, not native dbt syntax. Teams explicitly whitelist CDO attributes and choose their dbt entity/dimension semantics. The CDO business definition governs attribute names, types, and descriptions, and retains the central P&L metric contract. It must be compiled before a dbt build or hosted deployment.
+Team A and Team C both use `config.meta.uses: cdo.position` with matching structured `include.attributes` and `include.metrics` sections. This is **custom** inheritance metadata, not native dbt syntax. Teams explicitly whitelist CDO attributes and choose their dbt entity/dimension semantics. The CDO business definition governs attribute names, types, and descriptions, and retains the central P&L metric contract. It must be compiled before a dbt build or hosted deployment.
 
 ## Two workflows, one manual promotion point
 
@@ -32,7 +32,7 @@ The [CDO governance toolkit](https://github.com/robin-bajaj/cdo-semantic-governa
 
 ## Explicit CDO attribute selection
 
-The governance definition at `contracts/position_v1.yml` now declares only business attribute names/types/descriptions plus the governed P&L metric definition. Each team selects business attributes through structured `meta.cdo.include.attributes`, with local entity/dimension mappings alongside the selected field names. Newly registered CDO attributes are not implicitly inherited. The current CDO Position SQL composition requires `position_id`, `report_date`, and `profit_loss` from both teams; optional attributes included by only one team are represented as typed NULL in the other branch. Local team-specific fields and metrics remain independent.
+The governance definition at `contracts/position_v1.yml` now declares only business attribute names/types/descriptions plus the governed P&L metric definition. Each team selects business attributes through structured `meta.include.attributes`, with local entity/dimension mappings alongside the selected field names. Newly registered CDO attributes are not implicitly inherited. The current CDO Position SQL composition requires `position_id`, `report_date`, and `profit_loss` from both teams; optional attributes included by only one team are represented as typed NULL in the other branch. Local team-specific fields and metrics remain independent.
 
 ## Minimal CDO Position contract
 
