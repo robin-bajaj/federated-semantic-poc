@@ -2,7 +2,7 @@
 
 Team A (Equity) and Team C (Fixed Income) independently author their Position models in the federated dbt repository. The [CDO governance repository](https://github.com/robin-bajaj/cdo-semantic-governance) owns the enterprise `cdo.position` v1 contract, semantic inheritance compiler, validation, composer, and generator for native dbt CDO SQL/YAML.
 
-The teams' `config.meta.semantic_inheritance.extends: cdo.position` declaration is **custom** metadata, not native dbt syntax. It must be compiled before a dbt build or hosted deployment.
+The teams' `config.meta.semantic_inheritance.extends: cdo.position` declaration is **custom** metadata, not native dbt syntax. Team A/C explicitly whitelist the CDO attributes they consume using `include`, while specifying dbt-specific entity/dimension roles in `context`. The CDO business definition governs attribute names, types, and descriptions, and retains the central P&L metric contract. It must be compiled before a dbt build or hosted deployment.
 
 ## Two workflows, one manual promotion point
 
@@ -18,7 +18,7 @@ The teams' `config.meta.semantic_inheritance.extends: cdo.position` declaration 
 - **`generated/production`:** Full native dbt project following manual promotion, with compiled Team A/C semantic YAML and current composite CDO SQL/YAML. Only this branch is the deployment source for the hosted dbt job.
 - **CDO governance:** `contracts/position_v1.yml` is the source of truth. `cdo_governance.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
 
-**Governance revision:** `ebbfec8868c088750e43089977b7862580be3d40` is pinned in CI and promotion. Update both together after reviewing governance updates.
+**Governance revision:** `d897eb58a6ad91b9940dca44690539be4dbc81c7` is pinned in CI and promotion. Update both together after reviewing governance updates.
 
 **Promotion caveat:** An existing branch's manual merge into `generated/production` precedes compilation and validation, so the branch temporarily contains the freshly merged authored YAML until GitHub Actions finishes. Do not configure a hosted dbt Cloud deployment to run automatically on *every* branch push: manually invoke it **after** the promotion succeeds to avoid parsing transient custom inheritance metadata. If the promotion fails, the deployment branch is not ready and should not be deployed.
 
@@ -29,3 +29,7 @@ The teams' `config.meta.semantic_inheritance.extends: cdo.position` declaration 
 ## Governance package upgrade
 
 The [CDO governance toolkit](https://github.com/robin-bajaj/cdo-semantic-governance) is now a root-level Python project with `contracts/position_v1.yml`, `src/cdo_governance/semantic/`, `src/cdo_governance/validation/`, `tests/`, and `pyproject.toml`. Federated pipelines install the pinned checkout using `pip install ./contract-validator` and run `python -m cdo_governance.semantic.inheritance`, `...composition`, and `...dbt_generator` as appropriate.
+
+## Explicit CDO attribute selection
+
+The governance definition at `contracts/position_v1.yml` now declares only business attribute names/types/descriptions plus the governed P&L metric definition. Each team selects business attributes with `semantic_inheritance.include` and supplies its own `context.columns` semantic mappings. Newly registered CDO attributes are not implicitly inherited. The current CDO Position SQL composition requires `position_id`, `report_date`, and `profit_loss` from both teams; optional attributes included by only one team are represented as typed NULL in the other branch. Local team-specific fields and metrics remain independent.
