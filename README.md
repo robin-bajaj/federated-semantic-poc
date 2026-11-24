@@ -1,6 +1,6 @@
 # Federated dbt Semantic Layer POC
 
-Team A (Equity) and Team C (Fixed Income) independently author their Position models in the federated dbt repository. The [CDO governance repository](https://github.com/robin-bajaj/cdo-semantic-governance) owns the enterprise `cdo.position` v1 contract, semantic inheritance compiler, validation, composer, and generator for native dbt CDO SQL/YAML.
+Team A (Equity) and Team C (Fixed Income) independently author their Position models in the federated dbt repository. The [CDO governance repository](https://github.com/robin-bajaj/cdo-semantic-governance) owns the `cdo.all` v1 dictionary and versioned `cdo.position` / `cdo.counterparty` concept contracts, semantic inheritance compiler, validation, composer, and generator for native dbt CDO SQL/YAML.
 
 Team A and Team C both use `config.meta.uses: cdo.position` with matching structured `include.attributes` and `include.metrics` sections. This is **custom** inheritance metadata, not native dbt syntax. Teams explicitly whitelist CDO attributes and choose their dbt entity/dimension semantics. The CDO business definition governs attribute names, types, and descriptions, and retains the central P&L metric contract. It must be compiled before a dbt build or hosted deployment.
 
@@ -16,7 +16,7 @@ Team A and Team C both use `config.meta.uses: cdo.position` with matching struct
 
 - **`main`:** Independently authored Team A/C SQL and short inheritance YAML. The complete `models/semantic_models/team_cdo/` directory is intentionally absent from authored `main`. CDO definition and generator are in the governance repository.
 - **`generated/production`:** Full native dbt project following manual promotion, with compiled Team A/C semantic YAML and current composite CDO SQL/YAML. Only this branch is the deployment source for the hosted dbt job.
-- **CDO governance:** `contracts/position_v1.yml` is the source of truth. `cdo_governance.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
+- **CDO governance:** `contracts/all_v1.yml` is the central business definition source. `contracts/position_v1.yml` selects Position fields/metric, and `contracts/counterparty_v1.yml` selects Counterparty fields without duplicating their definitions. `cdo_governance.semantic.inheritance`, `compose_cdo`, and `generate_cdo_dbt` are implementation code owned by CDO. The combined promotion workflow writes the validated composition catalog to `artifacts/cdo/position_v1_composition.yml` in `generated/production`, outside dbt's `models/` directory; it is not stored in the governance repo or authored `main`.
 
 **Governance revision:** CI and promotion pin the same reviewed CDO governance commit. Update both workflow pins together when the governed contract or compiler changes.
 
@@ -28,12 +28,28 @@ Team A and Team C both use `config.meta.uses: cdo.position` with matching struct
 
 ## Governance package upgrade
 
-The [CDO governance toolkit](https://github.com/robin-bajaj/cdo-semantic-governance) is now a root-level Python project with `contracts/position_v1.yml`, `src/cdo_governance/semantic/`, `src/cdo_governance/validation/`, `tests/`, and `pyproject.toml`. Federated pipelines install the pinned checkout using `pip install ./contract-validator` and run `python -m cdo_governance.semantic.inheritance`, `...composition`, and `...dbt_generator` as appropriate.
+The [CDO governance toolkit](https://github.com/robin-bajaj/cdo-semantic-governance) is now a root-level Python project with `contracts/all_v1.yml`, `contracts/position_v1.yml`, `contracts/counterparty_v1.yml`, `src/cdo_governance/semantic/`, `src/cdo_governance/validation/`, `tests/`, and `pyproject.toml`. Federated pipelines install the pinned checkout using `pip install ./contract-validator` and run `python -m cdo_governance.semantic.inheritance`, `...composition`, and `...dbt_generator` as appropriate.
 
 ## Explicit CDO attribute selection
 
-The governance definition at `contracts/position_v1.yml` now declares only business attribute names/types/descriptions plus the governed P&L metric definition. Each team selects business attributes through structured `meta.include.attributes`, with local entity/dimension mappings alongside the selected field names. Newly registered CDO attributes are not implicitly inherited. The current CDO Position SQL composition requires `position_id`, `report_date`, and `profit_loss` from both teams; optional attributes included by only one team are represented as typed NULL in the other branch. Local team-specific fields and metrics remain independent.
+The enterprise dictionary at `contracts/all_v1.yml` declares common business attributes and the governed P&L metric definition. `contracts/position_v1.yml` selects its Position contract from that dictionary, while `contracts/counterparty_v1.yml` selects an independent Counterparty concept. Each team selects business attributes through structured `meta.include.attributes`, with local entity/dimension mappings alongside the selected field names. Newly registered CDO attributes are not implicitly inherited. The current CDO Position SQL composition requires `position_id`, `report_date`, and `profit_loss` from both teams; optional attributes included by only one team are represented as typed NULL in the other branch. Local team-specific fields and metrics remain independent.
 
 ## Minimal CDO Position contract
 
-The CDO-owned `contracts/position_v1.yml` defines `name: cdo.position`, `version: 1`, business attributes and a flat metric named `total_profit_loss`. Metric `type`, `agg`, `expr`, and `fill_nulls_with` are stored directly in the metric record. Team models refer to the metric by `total_profit_loss` because `uses: cdo.position` (or `extends: cdo.position`) already resolves its namespace. The compiler derives the metric contract version from the enclosing Position version. Native model contract enforcement is the default CDO policy for opted-in models, without requiring `require_native_contract: true` in this YAML.
+The CDO-owned `contracts/position_v1.yml` defines `name: cdo.position`, `version: 1` and selects attributes plus `total_profit_loss` from `cdo.all` v1. Metric `type`, `agg`, `expr`, and `fill_nulls_with` are stored directly in the metric record. Team models refer to the metric by `total_profit_loss` because `uses: cdo.position` (or `extends: cdo.position`) already resolves its namespace. The compiler derives the metric contract version from the enclosing Position version. Native model contract enforcement is the default CDO policy for opted-in models, without requiring `require_native_contract: true` in this YAML.
+
+
+## Three-level CDO governance architecture
+
+```text
+cdo.all v1              Central dictionary: Position + Counterparty fields and P&L
+   ├── cdo.position v1  Selects Position fields + total_profit_loss
+   │      ├── Team A    Authored Equity Position semantic model
+   │      └── Team C    Authored Fixed Income Position semantic model
+   └── cdo.counterparty v1
+                        Independent logical Counterparty contract (no SQL model yet)
+```
+
+Team A/C keep their current `config.meta.uses: cdo.position`, metric aliases, physical SQL, additional attributes and native dbt contracts. The **CDO compiler**, not dbt, resolves the version-pinned parent graph before generating native dbt metadata. Both pipelines run the registry validator and governance tests first. CI only validates teams; production promotion still requires the protected release build and separate dbt Cloud deployment handoff.
+
+Important: The Counterparty contract does **not** automatically create a relational table or a join from Position. A separate counterparty model and explicit semantic relationship will be needed for cross-concept queries. Governed contract versions should remain immutable once published; enforce by review policy and repository protection.
