@@ -37,7 +37,7 @@ models:
                   type: foreign
 
             metrics:
-              - name: profit_loss
+              - name: total_profit_loss
                 alias: equity_profit_loss
                 label: Equity Profit and Loss
 
