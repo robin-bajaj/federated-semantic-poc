@@ -63,7 +63,7 @@ jobs:
       # Validate all centrally governed contracts, including counterparty,
       # before compiling either team's inherited Position semantics.
       - name: Validate CDO_ALL business registry and concept inheritance
-        run: python -m cdo_governance.semantic.registry --registry cdo-governance/contracts
+        run: python -m cdo_governance.semantic.contract_registry --registry cdo-governance/contracts
 
       # dbt parse needs a syntactically valid adapter profile. These dummy
       # localhost credentials are intentionally not a real database connection:
@@ -96,7 +96,7 @@ jobs:
       - name: Compile inherited CDO Position semantics
         working-directory: dbt-project
         run: |
-          python -m cdo_governance.semantic.inheritance --registry ../cdo-governance/contracts --project .
+          python -m cdo_governance.semantic.semantic_compiler --registry ../cdo-governance/contracts --project .
           python - <<'PY'
           import yaml
           from pathlib import Path
