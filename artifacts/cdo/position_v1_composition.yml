@@ -3,6 +3,9 @@ name: cdo_enterprise_positions
 contract:
   name: cdo.position
   version: 1
+contract_lineage:
+- name: cdo.all
+  version: 1
 owner: CDO
 description: Composed semantic catalog; execution/routing must be implemented separately.
 common_attributes:
@@ -10,31 +13,56 @@ common_attributes:
 - report_date
 - profit_loss
 - instrument_code
+attribute_definitions:
+- name: position_id
+  data_type: text
+  description: Position identifier
+- name: report_date
+  data_type: date
+  description: Business reporting date
+- name: profit_loss
+  data_type: numeric
+  description: Standardized profit and loss
+- name: instrument_code
+  data_type: integer
+  description: Financial instrument identifier
+metric_definitions:
+- name: total_profit_loss
+  description: Total position profit and loss
+  type: simple
+  agg: sum
+  expr: profit_loss
+  fill_nulls_with: 0
 implementations:
 - source_model: stg_team_a_positions
   semantic_model: team_a_equity_positions
   owner: lob_team_a
   source_definition: models/semantic_models/team_a/team_a_semantics.yml
-  entity_aliases:
-    position: team_a_position
+  included_attributes:
+  - position_id
+  - report_date
+  - profit_loss
+  - instrument_code
   agg_time_dimension: report_date
   columns:
   - name: position_id
     data_type: text
-    description: Enterprise position identifier
+    description: Position identifier
     entity:
       name: team_a_position
       type: primary
   - name: report_date
     data_type: date
-    granularity: day
+    description: Business reporting date
     dimension:
       type: time
+    granularity: day
   - name: profit_loss
     data_type: numeric
-    description: Standardized position profit and loss
+    description: Standardized profit and loss
   - name: instrument_code
     data_type: integer
+    description: Financial instrument identifier
     entity:
       name: instrument
       type: foreign
@@ -49,14 +77,11 @@ implementations:
     fill_nulls_with: 0
     name: equity_profit_loss
     label: Equity Profit and Loss
-    description: 'Total position profit and loss measured as the sum of standardized position-level profit_loss
-      values over the query''s dimensions and date.
-
-      '
+    description: Total position profit and loss
     config:
       meta:
         metric_contract:
-          implements: cdo.profit_loss
+          implements: total_profit_loss
           version: 1
   - name: team_a_position_count
     label: Team A Position Count
@@ -80,26 +105,31 @@ implementations:
   semantic_model: team_c_fi_positions
   owner: lob_team_c
   source_definition: models/semantic_models/team_c/team_c_semantics.yml
-  entity_aliases:
-    position: team_c_position
+  included_attributes:
+  - position_id
+  - report_date
+  - profit_loss
+  - instrument_code
   agg_time_dimension: report_date
   columns:
   - name: position_id
     data_type: text
-    description: Enterprise position identifier
+    description: Position identifier
     entity:
       name: team_c_position
       type: primary
   - name: report_date
     data_type: date
-    granularity: day
+    description: Business reporting date
     dimension:
       type: time
+    granularity: day
   - name: profit_loss
     data_type: numeric
-    description: Standardized position profit and loss
+    description: Standardized profit and loss
   - name: instrument_code
     data_type: integer
+    description: Financial instrument identifier
     entity:
       name: instrument
       type: foreign
@@ -112,14 +142,11 @@ implementations:
     fill_nulls_with: 0
     name: fixed_income_profit_loss
     label: Fixed Income Profit and Loss
-    description: 'Total position profit and loss measured as the sum of standardized position-level profit_loss
-      values over the query''s dimensions and date.
-
-      '
+    description: Total position profit and loss
     config:
       meta:
         metric_contract:
-          implements: cdo.profit_loss
+          implements: total_profit_loss
           version: 1
   - name: team_c_position_count
     label: Team C Position Count

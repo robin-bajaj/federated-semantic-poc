@@ -22,17 +22,21 @@ models:
       type: categorical
   - name: position_id
     data_type: text
+    description: Position identifier
     dimension:
       type: categorical
   - name: report_date
     data_type: date
+    description: Business reporting date
     granularity: day
     dimension:
       type: time
   - name: profit_loss
     data_type: numeric
+    description: Standardized profit and loss
   - name: instrument_code
     data_type: integer
+    description: Financial instrument identifier
     dimension:
       type: categorical
     entity:
@@ -48,11 +52,13 @@ models:
     data_type: numeric
     description: Team-owned extension; NULL when not applicable to the source team.
   metrics:
-  - name: cdo_total_profit_loss
-    label: CDO Total Profit Loss
+  - description: Total position profit and loss
     type: simple
     agg: sum
     expr: profit_loss
+    fill_nulls_with: 0
+    name: cdo_total_profit_loss
+    label: CDO Total Profit Loss
   - name: cdo_position_row_count
     label: CDO Position Row Count
     description: Number of position rows across team/date; not necessarily distinct enterprise positions.
