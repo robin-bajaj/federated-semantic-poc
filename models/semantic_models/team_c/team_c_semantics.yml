@@ -39,9 +39,9 @@ models:
                   type: foreign
 
           metric_aliases:
-            profit_loss: fixed_income_profit_loss
+            total_profit_loss: fixed_income_profit_loss
           metric_labels:
-            profit_loss: Fixed Income Profit and Loss
+            total_profit_loss: Fixed Income Profit and Loss
     semantic_model:
       enabled: true
       name: team_c_fi_positions
