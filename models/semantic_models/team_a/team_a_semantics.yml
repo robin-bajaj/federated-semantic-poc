@@ -1,5 +1,5 @@
 # Team A's AUTHORED semantic model (the source of truth on main).
-# CDO centrally owns the standard Position columns, semantic relationships,
+# CDO centrally owns the selected Position attribute names, types and descriptions,
 # and P&L formula. Team A only specifies its source model, aliases, and additions.
 # This file contains CUSTOM inheritance metadata, so the CDO compiler must run
 # before dbt parses or deploys it; dbt does not natively support "extends".
@@ -25,11 +25,29 @@ models:
           extends: cdo.position  # Reuse CDO's enterprise Position definition.
           version: 1  # Adopt exactly version 1; CDO changes require explicit adoption.
 
-          # Rename the parent's semantic ENTITY (not the physical column).
-          # CDO defines entity "position" on position_id; Team A's position IDs
-          # are team-specific, so the compiled entity is "team_a_position".
-          entity_aliases:
-            position: team_a_position
+          # Opt in only to these CDO business attributes.
+          # CDO owns their types and descriptions; this team owns the mapping.
+          include:
+            - position_id
+            - report_date
+            - profit_loss
+            - instrument_code
+
+          context:
+            agg_time_dimension: report_date
+            columns:
+              position_id:
+                entity:
+                  name: team_a_position
+                  type: primary
+              report_date:
+                granularity: day
+                dimension:
+                  type: time
+              instrument_code:
+                entity:
+                  name: instrument
+                  type: foreign
 
           # Expose the parent's metric under Team A's own metric identifier.
           # The compiler copies CDO's SUM(profit_loss) calculation unchanged:
