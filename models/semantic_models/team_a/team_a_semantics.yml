@@ -1,6 +1,6 @@
 # Team A's AUTHORED semantic definition; kept short on main.
 # CDO owns common Position names, data types, descriptions, and P&L formula.
-# This custom meta.cdo declaration must be compiled before dbt parse/build;
+# This custom config.meta declaration must be compiled before dbt parse/build;
 # the compiler expands it into native dbt columns and metrics in a temporary checkout.
 version: 2
 
@@ -17,38 +17,37 @@ models:
         enforced: true
 
       meta:
-        cdo:
-          # Reuse the versioned CDO business definition; do not duplicate its types.
-          uses: cdo.position
-          version: 1
+        # Reuse the versioned CDO business definition; do not duplicate its types.
+        uses: cdo.position
+        version: 1
 
-          include:
-            # Opt in to CDO fields. Teams choose entity/dimension semantics;
-            # CDO supplies each selected field's name, type and description.
-            attributes:
-              - name: position_id
-                entity:
-                  name: team_a_position
-                  type: primary
+        include:
+          # Opt in to CDO fields. Teams choose entity/dimension semantics;
+          # CDO supplies each selected field's name, type and description.
+          attributes:
+            - name: position_id
+              entity:
+                name: team_a_position
+                type: primary
 
-              - name: report_date
-                dimension:
-                  type: time
-                granularity: day
+            - name: report_date
+              dimension:
+                type: time
+              granularity: day
 
-              - name: profit_loss
+            - name: profit_loss
 
-              - name: instrument_code
-                entity:
-                  name: instrument
-                  type: foreign
+            - name: instrument_code
+              entity:
+                name: instrument
+                type: foreign
 
-            # Adopt CDO SUM(profit_loss) without changing its formula.
-            # The alias is the team-facing metric name after compilation.
-            metrics:
-              - name: total_profit_loss
-                alias: equity_profit_loss
-                label: Equity Profit and Loss
+          # Adopt CDO SUM(profit_loss) without changing its formula.
+          # The alias is the team-facing metric name after compilation.
+          metrics:
+            - name: total_profit_loss
+              alias: equity_profit_loss
+              label: Equity Profit and Loss
 
     # Native dbt Semantic Layer model name exposed to metric consumers.
     semantic_model:
