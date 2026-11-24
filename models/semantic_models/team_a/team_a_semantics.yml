@@ -27,8 +27,10 @@ models:
           # CDO supplies each selected field's name, type and description.
           attributes:
             - name: position_id
+              # Custom CDO alias: expose this primary entity as equity_position_id.
+              # The physical/contract column remains position_id.
+              alias: equity_position_id
               entity:
-                name: team_a_position
                 type: primary
 
             - name: report_date
