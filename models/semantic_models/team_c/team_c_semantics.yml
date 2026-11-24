@@ -18,8 +18,9 @@ models:
 
       meta:
         # Reuse the versioned CDO business definition; do not duplicate its types.
-        uses: cdo.position
-        version: 1
+        uses:
+          name: cdo.position
+          version: 1
 
         include:
           # Opt in to CDO fields. Teams choose entity/dimension semantics;
