@@ -91,12 +91,12 @@ jobs:
         run: python -m pytest cdo-governance/tests -q
 
       - name: Validate CDO_ALL and versioned business concepts
-        run: python -m cdo_governance.semantic.registry --registry cdo-governance/contracts
+        run: python -m cdo_governance.semantic.contract_registry --registry cdo-governance/contracts
 
       - name: Compile team inheritance and parse native dbt project
         working-directory: dbt-project
         run: |
-          python -m cdo_governance.semantic.inheritance \
+          python -m cdo_governance.semantic.semantic_compiler \
             --registry ../cdo-governance/contracts \
             --project .
           mkdir -p .ci
@@ -122,7 +122,7 @@ jobs:
       - name: Compose both teams into temporary CDO catalog
         working-directory: dbt-project
         run: |
-          python -m cdo_governance.semantic.composition \
+          python -m cdo_governance.semantic.position_composer \
             --project . \
             --contract ../cdo-governance/contracts \
             --manifest target/manifest.json \
@@ -133,7 +133,7 @@ jobs:
       - name: Generate native CDO SQL/YAML and validate semantic manifest
         working-directory: dbt-project
         run: |
-          python -m cdo_governance.semantic.dbt_generator \
+          python -m cdo_governance.semantic.position_dbt_generator \
             --catalog /tmp/current_cdo_catalog.yml \
             --out models/semantic_models/team_cdo/generated
           test -s models/semantic_models/team_cdo/generated/cdo_enterprise_positions.sql
