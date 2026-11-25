@@ -106,6 +106,10 @@ jobs:
           ]:
               file = Path(f'models/semantic_models/{team}/{team}_semantics.yml')
               model = yaml.safe_load(file.read_text())['models'][0]
+              # The authored uses/include DSL is compile-time input, not native dbt.
+              meta = model['config']['meta']
+              assert set(meta) == {'semantic_contract'}, meta
+              assert meta['semantic_contract']['implements'] == 'cdo.position'
               cols = {c['name']: c for c in model['columns']}
               assert {'position_id', 'report_date', 'profit_loss', 'instrument_code'} <= set(cols)
               assert cols['report_date']['dimension']['type'] == 'time'
