@@ -107,7 +107,7 @@ jobs:
               file = Path(f'models/semantic_models/{team}/{team}_semantics.yml')
               model = yaml.safe_load(file.read_text())['models'][0]
               # The authored uses/include DSL is compile-time input, not native dbt.
-              meta = model['config']['meta']
+              meta = model['config'].get('meta') or {}
               assert not meta, meta
               assert not any('metric_contract' in (m.get('config') or {}).get('meta', {}) for m in model['metrics'])
               cols = {c['name']: c for c in model['columns']}
