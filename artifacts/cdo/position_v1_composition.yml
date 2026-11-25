@@ -78,11 +78,6 @@ implementations:
     name: equity_profit_loss
     label: Equity Profit and Loss
     description: Total position profit and loss
-    config:
-      meta:
-        metric_contract:
-          implements: total_profit_loss
-          version: 1
   - name: team_a_position_count
     label: Team A Position Count
     description: Number of Team A Equity Positions.
@@ -143,11 +138,6 @@ implementations:
     name: fixed_income_profit_loss
     label: Fixed Income Profit and Loss
     description: Total position profit and loss
-    config:
-      meta:
-        metric_contract:
-          implements: total_profit_loss
-          version: 1
   - name: team_c_position_count
     label: Team C Position Count
     description: Number of Team C Fixed Income Positions.
