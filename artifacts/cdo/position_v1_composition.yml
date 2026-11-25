@@ -49,8 +49,8 @@ implementations:
     data_type: text
     description: Position identifier
     entity:
-      name: team_a_position
       type: primary
+      name: equity_position_id
   - name: report_date
     data_type: date
     description: Business reporting date

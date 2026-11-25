@@ -3,13 +3,6 @@ version: 2
 models:
 - name: cdo_enterprise_positions
   description: CDO unified Position view composed from validated Team A and Team C sources.
-  config:
-    meta:
-      cdo_contract: cdo.position
-      cdo_contract_version: 1
-      composition_sources:
-      - stg_team_a_positions
-      - stg_team_c_positions
   semantic_model:
     enabled: true
     name: cdo_enterprise_positions
@@ -72,11 +65,6 @@ models:
     type: simple
     agg: sum
     expr: mtm
-    config:
-      meta:
-        source_team_metric: equity_total_mtm
-        owner: lob_team_a
-        source_semantic_model: team_a_equity_positions
   - name: cdo_equity_total_cash
     label: CDO Equity Total Cash
     description: CDO projection of team-owned metric equity_total_cash; SUM applies only to its source
@@ -84,11 +72,6 @@ models:
     type: simple
     agg: sum
     expr: cash
-    config:
-      meta:
-        source_team_metric: equity_total_cash
-        owner: lob_team_a
-        source_semantic_model: team_a_equity_positions
   - name: cdo_fi_total_settled_cash
     label: CDO Fixed Income Total Settled Cash
     description: CDO projection of team-owned metric fi_total_settled_cash; SUM applies only to its source
@@ -96,8 +79,3 @@ models:
     type: simple
     agg: sum
     expr: settled_cash
-    config:
-      meta:
-        source_team_metric: fi_total_settled_cash
-        owner: lob_team_c
-        source_semantic_model: team_c_fi_positions
