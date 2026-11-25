@@ -34,7 +34,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: robin-bajaj/cdo-semantic-governance
-          ref: 9d2565226491ac6eb9375622582d4a7ba0d42ec8 # Reviewed CDO governance commit
+          ref: a7deb9675d2a73eba214bc0e31aea2ed6de19530 # Reviewed CDO governance commit
           path: cdo-governance
           persist-credentials: false
 
@@ -96,7 +96,7 @@ jobs:
       - name: Compile inherited CDO Position semantics
         working-directory: dbt-project
         run: |
-          python -m cdo_governance.semantic.semantic_compiler --registry ../cdo-governance/contracts --project .
+          python -m cdo_governance.semantic.semantic_compiler --registry ../cdo-governance/contracts --project . --bindings-output .ci/cdo-resolved-bindings.yml
           python - <<'PY'
           import yaml
           from pathlib import Path
@@ -108,8 +108,8 @@ jobs:
               model = yaml.safe_load(file.read_text())['models'][0]
               # The authored uses/include DSL is compile-time input, not native dbt.
               meta = model['config']['meta']
-              assert set(meta) == {'semantic_contract'}, meta
-              assert meta['semantic_contract']['implements'] == 'cdo.position'
+              assert not meta, meta
+              assert not any('metric_contract' in (m.get('config') or {}).get('meta', {}) for m in model['metrics'])
               cols = {c['name']: c for c in model['columns']}
               assert {'position_id', 'report_date', 'profit_loss', 'instrument_code'} <= set(cols)
               assert cols['report_date']['dimension']['type'] == 'time'
