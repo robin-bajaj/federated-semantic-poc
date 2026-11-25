@@ -134,6 +134,20 @@ jobs:
           test -s target/manifest.json
           test -s target/semantic_manifest.json
 
+      # Verify real dbt manifest ↔ ephemeral CDO bindings before database work.
+      - name: Validate and compose CDO catalog from parsed native dbt models
+        working-directory: dbt-project
+        run: |
+          python -m cdo_governance.semantic.position_composer \
+            --project . \
+            --contract ../cdo-governance/contracts \
+            --manifest target/manifest.json \
+            --bindings .ci/cdo-resolved-bindings.yml \
+            --require-semantic-model team_a_equity_positions \
+            --require-semantic-model team_c_fi_positions \
+            --output .ci/cdo-current-composition.yml
+          test -s .ci/cdo-current-composition.yml
+
       # Native dbt contract enforcement requires a live database. Keep secrets
       # out of source and skip this credentialed step for fork PRs.
       - name: Build participating Team A/C models with enforced dbt contracts
