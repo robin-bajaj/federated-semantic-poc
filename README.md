@@ -92,3 +92,17 @@ config:
 ```
 
 The CDO Position and Counterparty contracts use the same `uses.name`/`uses.version` shape when referring to `cdo.all`. This is custom CDO metadata expanded by the pinned compiler before dbt parses the project. The top-level model and contract versions remain distinct from the referenced parent version.
+
+
+## Team A semantic Position alias
+
+Team A now optionally aliases the CDO-owned `position_id` attribute to the semantic entity name `equity_position_id`:
+
+```yaml
+- name: position_id
+  alias: equity_position_id
+  entity:
+    type: primary
+```
+
+After compilation, the native dbt column remains `name: position_id` with CDO's governed `data_type: text`, but its semantic entity is `entity: {name: equity_position_id, type: primary}`. The previous Team A semantic entity name `team_a_position` is replaced for this one field; downstream consumers referencing that entity name should migrate accordingly. Team C's `team_c_position` is unchanged. This is a CDO-owned custom compile-time syntax, not dbt's native table/view `config.alias`. The canonical `position_id` column and native contract are not renamed, and CDO Position composition still uses `position_id`.
