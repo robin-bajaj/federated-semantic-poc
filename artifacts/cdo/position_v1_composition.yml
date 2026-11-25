@@ -71,19 +71,6 @@ implementations:
   - name: cash
     data_type: numeric
   metrics:
-  - type: simple
-    agg: sum
-    expr: profit_loss
-    fill_nulls_with: 0
-    name: equity_profit_loss
-    label: Equity Profit and Loss
-    description: Total position profit and loss
-  - name: team_a_position_count
-    label: Team A Position Count
-    description: Number of Team A Equity Positions.
-    type: simple
-    agg: count
-    expr: position_id
   - name: equity_total_mtm
     label: Equity Total Mark to Market
     description: POC total MTM of Team A positions at the requested reporting grain.
@@ -96,6 +83,7 @@ implementations:
     type: simple
     agg: sum
     expr: cash
+  source_team: TEAM_A
 - source_model: stg_team_c_positions
   semantic_model: team_c_fi_positions
   owner: lob_team_c
@@ -131,22 +119,40 @@ implementations:
   - name: settled_cash
     data_type: numeric
   metrics:
-  - type: simple
-    agg: sum
-    expr: profit_loss
-    fill_nulls_with: 0
-    name: fixed_income_profit_loss
-    label: Fixed Income Profit and Loss
-    description: Total position profit and loss
-  - name: team_c_position_count
-    label: Team C Position Count
-    description: Number of Team C Fixed Income Positions.
-    type: simple
-    agg: count
-    expr: position_id
   - name: fi_total_settled_cash
     label: Fixed Income Total Settled Cash
     description: POC total settled cash of Team C positions at the requested reporting grain.
     type: simple
     agg: sum
     expr: settled_cash
+  source_team: TEAM_C
+enterprise_metrics:
+- cdo_total_profit_loss
+- cdo_position_row_count
+composition_selection:
+  sources:
+  - semantic_model: team_a_equity_positions
+    source_team: TEAM_A
+    attributes:
+    - position_id
+    - report_date
+    - profit_loss
+    - instrument_code
+    - mtm
+    - cash
+    metrics:
+    - equity_total_mtm
+    - equity_total_cash
+  - semantic_model: team_c_fi_positions
+    source_team: TEAM_C
+    attributes:
+    - position_id
+    - report_date
+    - profit_loss
+    - instrument_code
+    - settled_cash
+    metrics:
+    - fi_total_settled_cash
+  enterprise_metrics:
+  - cdo_total_profit_loss
+  - cdo_position_row_count

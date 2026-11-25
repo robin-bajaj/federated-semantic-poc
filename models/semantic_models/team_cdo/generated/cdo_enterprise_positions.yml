@@ -1,8 +1,8 @@
-# AUTO-GENERATED; native dbt model + semantic configuration (v1.12+)
+# AUTO-GENERATED from approved CDO selection; native dbt YAML.
 version: 2
 models:
 - name: cdo_enterprise_positions
-  description: CDO unified Position view composed from validated Team A and Team C sources.
+  description: Selected, governed CDO Position view.
   semantic_model:
     enabled: true
     name: cdo_enterprise_positions
@@ -33,17 +33,26 @@ models:
     dimension:
       type: categorical
     entity:
-      type: foreign
       name: instrument
+      type: foreign
   - name: cash
     data_type: numeric
-    description: Team-owned extension; NULL when not applicable to the source team.
+    description: Selected team extension; NULL on other teams.
   - name: mtm
     data_type: numeric
-    description: Team-owned extension; NULL when not applicable to the source team.
+    description: Selected team extension; NULL on other teams.
   - name: settled_cash
     data_type: numeric
-    description: Team-owned extension; NULL when not applicable to the source team.
+    description: Selected team extension; NULL on other teams.
+  - name: cdo_value_team_a_equity_total_mtm
+    data_type: numeric
+    description: Internal selected TEAM_A metric input.
+  - name: cdo_value_team_a_equity_total_cash
+    data_type: numeric
+    description: Internal selected TEAM_A metric input.
+  - name: cdo_value_team_c_fi_total_settled_cash
+    data_type: numeric
+    description: Internal selected TEAM_C metric input.
   metrics:
   - description: Total position profit and loss
     type: simple
@@ -54,28 +63,25 @@ models:
     label: CDO Total Profit Loss
   - name: cdo_position_row_count
     label: CDO Position Row Count
-    description: Number of position rows across team/date; not necessarily distinct enterprise positions.
+    description: Count of selected Position rows, not globally distinct IDs.
     type: simple
     agg: count
     expr: position_id
   - name: cdo_equity_total_mtm
     label: CDO Equity Total Mark to Market
-    description: CDO projection of team-owned metric equity_total_mtm; SUM applies only to its source
-      team's non-NULL extension values. POC financial aggregation pending approval.
+    description: Selected TEAM_A metric from team_a_equity_positions.
     type: simple
     agg: sum
-    expr: mtm
+    expr: cdo_value_team_a_equity_total_mtm
   - name: cdo_equity_total_cash
     label: CDO Equity Total Cash
-    description: CDO projection of team-owned metric equity_total_cash; SUM applies only to its source
-      team's non-NULL extension values. POC financial aggregation pending approval.
+    description: Selected TEAM_A metric from team_a_equity_positions.
     type: simple
     agg: sum
-    expr: cash
+    expr: cdo_value_team_a_equity_total_cash
   - name: cdo_fi_total_settled_cash
     label: CDO Fixed Income Total Settled Cash
-    description: CDO projection of team-owned metric fi_total_settled_cash; SUM applies only to its source
-      team's non-NULL extension values. POC financial aggregation pending approval.
+    description: Selected TEAM_C metric from team_c_fi_positions.
     type: simple
     agg: sum
-    expr: settled_cash
+    expr: cdo_value_team_c_fi_total_settled_cash

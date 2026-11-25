@@ -1,5 +1,4 @@
--- AUTO-GENERATED from the validated CDO semantic composition catalog.
--- Logical UNION ALL view; no physical copy of source positions.
+-- AUTO-GENERATED from approved CDO Position composition selection.
 {{ config(materialized='view') }}
 
 select
@@ -10,7 +9,10 @@ select
     instrument_code::integer as instrument_code,
     cash::numeric as cash,
     mtm::numeric as mtm,
-    null::numeric as settled_cash
+    null::numeric as settled_cash,
+    mtm::numeric as cdo_value_team_a_equity_total_mtm,
+    cash::numeric as cdo_value_team_a_equity_total_cash,
+    null::numeric as cdo_value_team_c_fi_total_settled_cash
 from {{ ref('stg_team_a_positions') }}
 
 union all
@@ -23,5 +25,8 @@ select
     instrument_code::integer as instrument_code,
     null::numeric as cash,
     null::numeric as mtm,
-    settled_cash::numeric as settled_cash
+    settled_cash::numeric as settled_cash,
+    null::numeric as cdo_value_team_a_equity_total_mtm,
+    null::numeric as cdo_value_team_a_equity_total_cash,
+    settled_cash::numeric as cdo_value_team_c_fi_total_settled_cash
 from {{ ref('stg_team_c_positions') }}
