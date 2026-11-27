@@ -1,0 +1,62 @@
+version: 2
+models:
+- name: stg_team_equity_positions
+  description: Team A's AUTHORED semantic definition. CDO owns common Position names, data types, descriptions,
+    and P&L formula
+  config:
+    group: lob_team_a
+    access: protected
+    contract:
+      enforced: true
+  semantic_model:
+    enabled: true
+    name: team_equity_semantics
+  agg_time_dimension: report_date
+  columns:
+  - name: position_id
+    data_type: text
+    description: Position identifier
+    entity:
+      type: primary
+      name: team_equity_position_id
+  - name: report_date
+    data_type: date
+    description: Business reporting date
+    dimension:
+      type: time
+    granularity: day
+  - name: profit_loss
+    data_type: numeric
+    description: Standardized profit and loss
+  - name: instrument_code
+    data_type: integer
+    description: Financial instrument identifier
+    entity:
+      type: foreign
+  - name: mtm
+    data_type: numeric
+  - name: cash
+    data_type: numeric
+  metrics:
+  - type: simple
+    agg: sum
+    expr: profit_loss
+    fill_nulls_with: 0
+    name: team_equity_profit_loss
+    label: team_equity_profit_loss
+    description: Total position profit and loss
+  - name: team_equity_position_count
+    type: simple
+    agg: count
+    expr: position_id
+    description: Number of Team Equity Positions
+  - name: team_equity_total_mtm
+    type: simple
+    agg: sum
+    expr: mtm
+    description: POC total MTM of Team equity positions at the requested reporting grain
+  - name: team_equity_total_cash
+    type: simple
+    agg: sum
+    expr: cash
+    description: POC total Cash of Team equity positions at the requested reporting grain
