@@ -1,0 +1,202 @@
+# Required database-backed check for portal-created model branches.
+# This workflow must be available on main before the portal can dispatch it.
+name: Portal Pre-Publish Database Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact model-commit SHA the portal is asking us to test
+        required: true
+        type: string
+      source_model:
+        description: dbt model to build, including its upstream dependencies
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portal-prepublish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Build requested model against isolated Neon schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      MODEL_NAME: ${{ inputs.source_model }}
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      DBT_PG_HOST: ${{ secrets.DBT_PG_HOST }}
+      DBT_PG_PORT: ${{ secrets.DBT_PG_PORT }}
+      DBT_PG_USER: ${{ secrets.DBT_PG_USER }}
+      DBT_ENV_SECRET_PG_PASSWORD: ${{ secrets.DBT_PG_PASSWORD }}
+      DBT_PG_DBNAME: ${{ secrets.DBT_PG_DBNAME }}
+      DBT_PG_SCHEMA: portal_preflight_${{ github.run_id }}_${{ github.run_attempt }}
+    steps:
+      - name: Validate requested branch revision and model identifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/portal/* ]] || { echo "Only portal validation branches allowed"; exit 1; }
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid expected SHA"; exit 1; }
+          [[ "$GITHUB_SHA" == "$EXPECTED_SHA" ]] || { echo "Branch revision changed since submission"; exit 1; }
+          [[ "$MODEL_NAME" =~ ^[a-z][a-z0-9_]*$ ]] || { echo "Invalid model identifier"; exit 1; }
+          for key in DBT_PG_HOST DBT_PG_USER DBT_ENV_SECRET_PG_PASSWORD DBT_PG_DBNAME; do
+            if [[ -z "${!key:-}" ]]; then
+              echo "::error::Missing required Neon connection secret: $key"
+              exit 1
+            fi
+          done
+
+      - name: Checkout exact candidate revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          path: dbt-project
+          persist-credentials: false
+
+      - name: Checkout reviewed CDO compiler and contracts
+        uses: actions/checkout@v4
+        with:
+          repository: robin-bajaj/cdo-semantic-governance
+          ref: 5821b6f8a657e97f3f1b774334719c2cdb0b5778
+          path: cdo-governance
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt Core and CDO compiler
+        run: |
+          python -m pip install 'dbt-core==1.12.6' 'dbt-postgres==1.11.0' ./cdo-governance
+
+      - name: Resolve CDO inheritance and configure isolated connection
+        working-directory: dbt-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ci
+          python -m cdo_governance.semantic.contract_registry --registry ../cdo-governance/contracts
+          python -m cdo_governance.semantic.semantic_compiler \
+            --registry ../cdo-governance/contracts \
+            --project . \
+            --bindings-output .ci/cdo-resolved-bindings.yml
+          cat > .ci/profiles.yml <<'PROFILE'
+          default:
+            target: preflight
+            outputs:
+              preflight:
+                type: postgres
+                host: "{{ env_var('DBT_PG_HOST') }}"
+                port: "{{ env_var('DBT_PG_PORT', '5432') | int }}"
+                user: "{{ env_var('DBT_PG_USER') }}"
+                password: "{{ env_var('DBT_ENV_SECRET_PG_PASSWORD') }}"
+                dbname: "{{ env_var('DBT_PG_DBNAME') }}"
+                schema: "{{ env_var('DBT_PG_SCHEMA') }}"
+                sslmode: require
+                threads: 2
+          PROFILE
+          if [ -f packages.yml ] || [ -f dependencies.yml ]; then
+            dbt deps --profiles-dir .ci --target preflight
+          fi
+
+      - name: Parse and compile exact proposed dbt project
+        working-directory: dbt-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          dbt parse --profiles-dir .ci --target preflight --no-partial-parse
+          # Verify that the exact requested model exists. Fail closed if none
+          # or multiple nodes match the supplied name.
+          dbt ls --profiles-dir .ci --target preflight \
+            --resource-type model --select "$MODEL_NAME" --output json > .ci/selected.jsonl
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          name = os.environ["MODEL_NAME"]
+          models = []
+          for line in Path(".ci/selected.jsonl").read_text().splitlines():
+              try:
+                  node = json.loads(line)
+              except ValueError:
+                  continue
+              if node.get("resource_type") == "model":
+                  models.append(node.get("name"))
+          assert models == [name], f"Requested model must select exactly one dbt model: {models}"
+          PY
+          dbt compile --profiles-dir .ci --target preflight \
+            --select "+$MODEL_NAME" --no-partial-parse
+
+      - name: Connect to Neon and build dependencies, staging SQL, contracts, and tests
+        working-directory: dbt-project
+        shell: bash
+        run: |
+          set -euo pipefail
+          dbt debug --profiles-dir .ci --target preflight --connection
+          # dbt build selects upstream ref() dependencies (including seeds).
+          # Existing model contract enforcement and dbt tests run here.
+          dbt build --profiles-dir .ci --target preflight \
+            --select "+$MODEL_NAME" --no-partial-parse
+          test -s target/run_results.json
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          results = json.loads(Path("target/run_results.json").read_text())["results"]
+          assert results, "No models or tests were built"
+          failed = [f"{r['unique_id']}: {r['status']}" for r in results
+                    if r['status'] not in ('success', 'pass')]
+          assert not failed, f"Unsuccessful dbt resources: {failed}"
+          print(f"Validated {len(results)} resources against Neon in an isolated schema")
+          PY
+
+      - name: Upload preflight manifests
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-preflight-${{ github.run_id }}
+          path: |
+            dbt-project/target/manifest.json
+            dbt-project/target/run_results.json
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Clean up only this run's validation schema
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, re
+          import psycopg2
+          from psycopg2 import sql
+          schema = os.environ.get("DBT_PG_SCHEMA", "")
+          if not re.fullmatch(r"portal_preflight_[0-9]+_[0-9]+", schema):
+              raise SystemExit("Refusing to clean up an unexpected schema name")
+          if not all(os.environ.get(key) for key in
+                     ("DBT_PG_HOST", "DBT_PG_USER", "DBT_ENV_SECRET_PG_PASSWORD", "DBT_PG_DBNAME")):
+              print("Connection not configured; no schema to clean up")
+              raise SystemExit(0)
+          try:
+              connection = psycopg2.connect(
+                  host=os.environ["DBT_PG_HOST"],
+                  port=int(os.environ.get("DBT_PG_PORT") or "5432"),
+                  user=os.environ["DBT_PG_USER"],
+                  password=os.environ["DBT_ENV_SECRET_PG_PASSWORD"],
+                  dbname=os.environ["DBT_PG_DBNAME"],
+                  sslmode="require", connect_timeout=10,
+              )
+              connection.autocommit = True
+              with connection.cursor() as cur:
+                  cur.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema)))
+              connection.close()
+              print("Isolated validation schema cleaned up")
+          except Exception as exc:
+              # Cleanup failure should be visible for an administrator to fix;
+              # a successful build's status is still determined above.
+              print("Cleanup error:", type(exc).__name__)
+              raise
+          PY
